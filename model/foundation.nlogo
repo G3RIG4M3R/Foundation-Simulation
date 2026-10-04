@@ -17,7 +17,8 @@ trade-routes-own [route-strength route-age]
 globals [
   foundation-treasury trade-income-this-tick cumulative-trade-profit
   total-executed-missionaries total-executed-traders
-  total-rejected-missions total-rejected-trades total-successful-trades
+  total-rejected-missions total-successful-missions
+  total-rejected-trades total-successful-trades
   kingdom-policy-timer tick-limit terminus-planet
 ]
 
@@ -187,7 +188,129 @@ to process-environment
 end
 
 to process-missionaries
-  ;; TODO Stage 2: travel and mission visits. Agents remain idle for now.
+  ask planets with [temple? and not foundation?] [ dismantle-repressed-temple ]
+  ask missionaries [ step-missionary ]
+end
+
+;; MISSIONARIES: one movement and at most one visit per tick.
+
+to step-missionary
+  if mode = "detained" [
+    set wait-ticks max (list 0 (wait-ticks - 1))
+    if wait-ticks = 0 [ set mode "idle" ]
+    ;; The release tick is still a full waiting tick; depart next tick.
+    stop
+  ]
+  if mode = "idle" [ select-missionary-destination ]
+  if mode = "travel" [ move-missionary ]
+end
+
+to select-missionary-destination
+  let candidates sort planets with [not foundation? and distance myself > 0]
+  set target-planet nobody
+  if empty? candidates [ stop ]
+  ifelse random-float 1 < 0.15 [
+    set target-planet one-of candidates
+  ] [
+    let weights map [world -> missionary-target-weight world] candidates
+    set target-planet weighted-choice candidates weights
+  ]
+  if target-planet != nobody [ set mode "travel" ]
+end
+
+to-report missionary-target-weight [world]
+  let temple-factor ifelse-value [temple?] of world [1.5] [1]
+  report (0.05 + mission-acceptance-probability world) *
+    (0.25 + 1 - [religion] of world) * temple-factor / (1 + distance world / 16)
+end
+
+to-report weighted-choice [candidates weights]
+  if empty? candidates [ report nobody ]
+  if empty? weights [ report one-of candidates ]
+  let total sum weights
+  if total <= 0 [ report one-of candidates ]
+  let draw random-float total
+  let cumulative 0
+  let index 0
+  foreach weights [weight ->
+    set cumulative cumulative + weight
+    if draw < cumulative [ report item index candidates ]
+    set index index + 1
+  ]
+  ;; Floating-point summation fallback; the final positive weight is eligible.
+  report item (last filter [i -> item i weights > 0] (range length weights)) candidates
+end
+
+to move-missionary
+  if not is-planet? target-planet [
+    set target-planet nobody
+    set mode "idle"
+    stop
+  ]
+  if [foundation?] of target-planet [
+    set target-planet nobody
+    set mode "idle"
+    stop
+  ]
+  let remaining distance target-planet
+  if remaining > 0 [
+    face target-planet
+    ifelse remaining <= 1.5 [ move-to target-planet ] [ fd 1.5 ]
+  ]
+  ;; Center arrival avoids a free snap from the 0.75-unit arrival neighborhood.
+  if distance target-planet = 0 [ resolve-missionary-visit ]
+end
+
+to resolve-missionary-visit
+  if mode != "travel" or not is-planet? target-planet [ stop ]
+  if [foundation?] of target-planet or distance target-planet > 0 [ stop ]
+  let destination target-planet
+  let visitor-skill mission-skill
+  ;; Consume the arrival before either outcome, including death.
+  set target-planet nobody
+  set mode "idle"
+  set wait-ticks 0
+  ifelse random-float 1 < mission-acceptance-probability destination [
+    set total-successful-missions total-successful-missions + 1
+    ask destination [ apply-accepted-mission visitor-skill ]
+  ] [
+    set total-rejected-missions total-rejected-missions + 1
+    ask destination [ set failed-visits failed-visits + 1 ]
+    if random-float 1 < execution-probability destination [
+      set total-executed-missionaries total-executed-missionaries + 1
+      die
+    ]
+    set mode "detained"
+    set wait-ticks 2 + random 4
+  ]
+end
+
+to-report mission-acceptance-probability [world]
+  let temple-bonus ifelse-value [temple?] of world [0.10] [0]
+  let restriction ifelse-value ([policy] of world = "restrict") [0.18] [0]
+  let embargo ifelse-value ([policy] of world = "embargo") [0.35] [0]
+  report clamp-range (0.15 + 0.35 * (1 - [hostility] of world) +
+    0.15 * [religion] of world + temple-bonus - 0.35 * royal-intolerance -
+    0.20 * [taboo] of world - restriction - embargo) 0.02 0.95
+end
+
+to-report execution-probability [world]
+  let restriction ifelse-value ([policy] of world = "restrict") [0.10] [0]
+  let embargo ifelse-value ([policy] of world = "embargo") [0.18] [0]
+  report clamp-range (0.01 + 0.12 * [hostility] of world +
+    0.10 * royal-intolerance + restriction + embargo) 0 0.55
+end
+
+to apply-accepted-mission [visitor-skill]
+  set religion clamp01 (religion + missionary-effectiveness * visitor-skill *
+    (1 - religion) * (0.40 + 0.60 * tech-dependency))
+  if religion >= 0.60 and policy != "embargo" [ set temple? true ]
+  dismantle-repressed-temple
+  if temple? and policy != "embargo" [ set tech-health clamp01 (tech-health + 0.03) ]
+end
+
+to dismantle-repressed-temple
+  if religion < 0.35 and member? policy ["restrict" "embargo"] [ set temple? false ]
 end
 
 to process-traders
@@ -323,7 +446,7 @@ to-report model-valid?
   if not in-range? trade-income-this-tick 0 1.0E+300 [ report false ]
   report empty? filter [value -> not natural-number? value] (list
     total-executed-missionaries total-executed-traders total-rejected-missions
-    total-rejected-trades total-successful-trades kingdom-policy-timer)
+    total-successful-missions total-rejected-trades total-successful-trades kingdom-policy-timer)
 end
 
 to-report planet-state-valid?
@@ -354,6 +477,10 @@ to-report destination-valid?
 end
 
 to-report missionary-state-valid?
+  if mode = "travel" and target-planet = nobody [ report false ]
+  if mode != "travel" and target-planet != nobody [ report false ]
+  if mode = "detained" and not in-range? wait-ticks 1 5 [ report false ]
+  if mode != "detained" and wait-ticks != 0 [ report false ]
   report destination-valid? and is-planet? home-planet and in-range? mission-skill 0.75 1.25
 end
 
@@ -577,22 +704,47 @@ view-mode
 @#$#@#$#@
 ## WHAT IS IT?
 
-A galaxy initialization for a Foundation-inspired study of non-military influence.
+A Foundation-inspired study of non-military influence through missionary visits.
 The world contains Terminus, four kingdoms of five planets each, and ten
 independent markets. The period and star map are fictional abstractions.
 
 ## HOW TO USE IT
 
 Click setup to create a new galaxy. go-once advances one tick; go runs to 450.
-All planets remain stationary. Missionaries and traders are initialized at
-Terminus and stay idle in this version. No religious, trading, economic or
-political processes operate yet. No experimental results are claimed.
+All planets remain stationary. Missionaries depart from Terminus, travel between
+worlds, and attempt to spread Scientism. Traders remain idle. Trading, passive
+technology maintenance, government decisions and recruitment are not active yet.
 
-The two initial-count sliders set the number of idle travelers. The other six
-sliders reserve the parameters for subsequent model behavior. view-mode changes
+The two initial-count sliders set starting populations. missionary-effectiveness
+scales conversion; royal-intolerance lowers admission and raises execution risk.
+The other four sliders reserve parameters for subsequent behavior. view-mode changes
 planet color only: kingdom, religion, dependency or control. Terminus is always
 a gold star; capitals are ringed and labeled. Cyan arrows represent missionaries
-and white squares represent traders; idle travelers overlap at Terminus.
+and white squares represent traders; agents at the same location overlap.
+
+## MISSIONARY RULES
+
+Each missionary selects a world other than Terminus or its current planet:
+15% uniform exploration, otherwise a weighted random choice favoring admission,
+remaining conversion potential, temples and proximity. Admission is drawn only
+on arrival. Travel follows the shortest toroidal path at up to 1.5 units per
+tick, reaching the planet center before exactly one visit is resolved.
+
+Acceptance depends on local hostility, religion, temples, taboo, policy and
+royal-intolerance. Probabilities are bounded [.02,.95]. Accepted conversion is
+missionary-effectiveness * mission-skill * (1 - religion) *
+(.40 + .60 * tech-dependency). Skill is sampled in [.75,1.25).
+Religion stays in [0,1]. At religion >= .60, a temple can form unless embargoed;
+an active temple repairs health by .03 per accepted visit, up to 1.
+Embargo blocks construction and repair, even on rare accepted missions.
+Under restrict/embargo, a temple is dismantled when religion < .35.
+
+A rejected missionary is executed with a separate state-dependent probability
+bounded [0,.55], or detained at the destination for 2–5 complete subsequent
+ticks. Survivors then choose another world. Deaths are not replaced yet.
+total-successful-missions, total-rejected-missions and
+total-executed-missionaries are cumulative since setup. Planet failed-visits
+counts rejections. Missionary activity produces no trade income or routes.
 
 ## INITIALIZATION
 
