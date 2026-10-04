@@ -1,0 +1,11 @@
+results/*
+!results/.gitkeep
+
+*.tmp
+*.log
+*~
+
+__pycache__/
+.venv/
+
+.vscode/
