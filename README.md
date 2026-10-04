@@ -24,8 +24,10 @@ is a self-contained NetLogo 6.4.x `.nlogo` file.
 | `presentation/` | Planned presentation in PPTX and PDF |
 | `docs/` | Environment, assignment requirements, and model limitations |
 
-See [assignment requirements](docs/assignment_requirements.md) and
-[model limitations](docs/model_limitations.md). Empty directories are reserved
+Run the installation check using [environment instructions](docs/netlogo_environment.md).
+See [assignment requirements](docs/assignment_requirements.md),
+[model limitations](docs/model_limitations.md), and the
+[verification protocol](tests/test_protocol.md). Empty directories are reserved
 for future deliverables; they do not represent completed work.
 
 The project retains its [MIT license](LICENSE). The instructor's assignment and

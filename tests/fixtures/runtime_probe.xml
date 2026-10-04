@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">
+<experiments>
+  <experiment name="Runtime probe" repetitions="2" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="3"/>
+    <metric>netlogo-version</metric>
+    <metric>ticks</metric>
+    <metric>world-width</metric>
+    <metric>world-height</metric>
+    <metric>count turtles</metric>
+  </experiment>
+</experiments>
