@@ -1,5 +1,5 @@
-results/*
-!results/.gitkeep
+# Scratch output only; measured results and figures may be versioned.
+/results/tmp/
 
 *.tmp
 *.log
