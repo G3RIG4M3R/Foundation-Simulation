@@ -314,11 +314,152 @@ to dismantle-repressed-temple
 end
 
 to process-traders
-  ;; TODO Stage 3: travel and transactions. Agents remain idle for now.
+  ask traders [ step-trader ]
+end
+
+;; TRADERS: preserve the departure origin until the arrival transaction finishes.
+
+to step-trader
+  if mode = "detained" [
+    set wait-ticks max (list 0 (wait-ticks - 1))
+    if wait-ticks = 0 [ set mode "idle" ]
+    stop
+  ]
+  if mode = "idle" [ select-trader-destination ]
+  if mode = "travel" [ move-trader ]
+end
+
+to select-trader-destination
+  let candidates sort planets with [not foundation? and distance myself > 0]
+  set target-planet nobody
+  if empty? candidates [ stop ]
+  ifelse random-float 1 < 0.15 [
+    set target-planet one-of candidates
+  ] [
+    let weights map [world -> trader-target-weight world] candidates
+    set target-planet weighted-choice candidates weights
+  ]
+  if target-planet != nobody [
+    ;; Capacity is renewed between visits; physical inventory is not modeled.
+    set cargo 1
+    set mode "travel"
+  ]
+end
+
+to-report trader-target-weight [world]
+  let route-factor ifelse-value (direct-trade-route origin-planet world != nobody) [1.75] [1]
+  report (0.05 + trade-acceptance-probability world) *
+    (0.25 + [tech-demand] of world) * route-factor / (1 + distance world / 16)
+end
+
+to-report direct-trade-route [origin destination]
+  if not is-planet? origin or not is-planet? destination [ report nobody ]
+  if origin = destination [ report nobody ]
+  report [trade-route-with destination] of origin
+end
+
+to-report trader-travel-speed
+  ;; Resolve the link afresh; decay can remove it while the trader is in transit.
+  let route direct-trade-route origin-planet target-planet
+  if route != nobody [
+    if [route-strength] of route >= 0.15 [ report 2.25 ]
+  ]
+  report 1.5
+end
+
+to move-trader
+  if not is-planet? target-planet [
+    set target-planet nobody
+    set mode "idle"
+    stop
+  ]
+  if [foundation?] of target-planet or target-planet = origin-planet [
+    set target-planet nobody
+    set mode "idle"
+    stop
+  ]
+  let remaining distance target-planet
+  if remaining > 0 [
+    face target-planet
+    let speed trader-travel-speed
+    ifelse remaining <= speed [ move-to target-planet ] [ fd speed ]
+  ]
+  if distance target-planet = 0 [ resolve-trader-visit ]
+end
+
+to resolve-trader-visit
+  if mode != "travel" or not is-planet? target-planet [ stop ]
+  if [foundation?] of target-planet or target-planet = origin-planet [ stop ]
+  if distance target-planet > 0 or cargo <= 0 [ stop ]
+  let destination target-planet
+  let departure origin-planet
+  set target-planet nobody
+  set mode "idle"
+  set wait-ticks 0
+  ifelse random-float 1 < trade-acceptance-probability destination [
+    let sale-size trade-attractiveness * trade-skill
+    ask destination [ apply-trade-sale sale-size ]
+    set total-successful-trades total-successful-trades + 1
+    let revenue 12 * sale-size
+    set trade-income-this-tick trade-income-this-tick + revenue
+    set foundation-treasury foundation-treasury + revenue
+    set cumulative-trade-profit cumulative-trade-profit + revenue
+    ;; Zero-size admissions are counted but cannot create or reinforce routes.
+    if sale-size > 0 [ renew-trade-route departure destination sale-size ]
+    set cargo 0
+  ] [
+    set total-rejected-trades total-rejected-trades + 1
+    ask destination [ set failed-visits failed-visits + 1 ]
+    if random-float 1 < execution-probability destination [
+      set total-executed-traders total-executed-traders + 1
+      die
+    ]
+    set mode "detained"
+    set wait-ticks 2 + random 4
+  ]
+  set origin-planet destination
+end
+
+to-report trade-acceptance-probability [world]
+  let restriction ifelse-value ([policy] of world = "restrict") [0.20] [0]
+  let embargo ifelse-value ([policy] of world = "embargo") [0.45] [0]
+  report clamp-range (0.10 + religion-trade-weight * [religion] of world +
+    0.25 * [tech-demand] of world + 0.15 * [trade-trust] of world -
+    0.40 * [hostility] of world - 0.30 * [taboo] of world - restriction - embargo) 0.02 0.95
+end
+
+to apply-trade-sale [sale-size]
+  set tech-dependency clamp01 (tech-dependency + 0.11 * sale-size)
+  set tech-health clamp01 (tech-health + 0.12 * sale-size)
+  set trade-trust clamp01 (trade-trust + 0.09 * sale-size)
+  set tech-demand clamp01 (tech-demand - 0.15 * sale-size)
+  ;; Net development benefit after payment, not a conserved cash balance.
+  set wealth clamp-range (wealth + 3 * sale-size) 0 100
+  set successful-trades successful-trades + 1
+end
+
+to renew-trade-route [origin destination sale-size]
+  if sale-size <= 0 [ stop ]
+  if not is-planet? origin or not is-planet? destination [ stop ]
+  if origin = destination [ stop ]
+  let route direct-trade-route origin destination
+  ifelse route = nobody [
+    ask origin [ create-trade-route-with destination [
+      set route-strength 0.35
+      set route-age 0
+    ] ]
+  ] [
+    ask route [ set route-strength clamp01 (route-strength + 0.20 * sale-size) ]
+  ]
 end
 
 to process-trade-routes
-  ;; TODO Stage 3: decay routes exactly once, after trader activity.
+  ;; Exactly once after trader activity, including newly established routes.
+  ask trade-routes [
+    set route-strength clamp01 (route-strength - 0.002)
+    set route-age route-age + 1
+    if route-strength < 0.08 [ die ]
+  ]
 end
 
 to process-kingdom-policies
@@ -350,6 +491,10 @@ to update-appearance
     set shape "trader"
     set color white
     set size 1.2
+  ] ]
+  foreach sort trade-routes [ route -> ask route [
+    set color scale-color blue route-strength -0.25 1.25
+    set thickness 0.05 + 0.35 * route-strength
   ] ]
 end
 
@@ -401,6 +546,11 @@ to-report mean-dependency
   report mean map [world -> [tech-dependency] of world] worlds
 end
 
+to-report active-trade-links
+  ;; Counts all extant relationships, including weak remnants below speed threshold.
+  report count trade-routes
+end
+
 to-report in-range? [value lower upper]
   if not is-number? value [ report false ]
   report value >= lower and value <= upper
@@ -439,6 +589,7 @@ to-report model-valid?
     not is-planet? end1 or not is-planet? end2 or end1 = end2 or
     not in-range? route-strength 0 1 or not natural-number? route-age
   ] [ report false ]
+  if count trade-routes > count planets * (count planets - 1) / 2 [ report false ]
   if tick-limit != 450 or not in-range? ticks 0 tick-limit [ report false ]
   if not natural-number? ticks [ report false ]
   if not in-range? foundation-treasury 0 1.0E+300 [ report false ]
@@ -471,20 +622,21 @@ end
 to-report destination-valid?
   if not member? mode ["idle" "travel" "detained"] [ report false ]
   if not natural-number? wait-ticks [ report false ]
+  if mode = "travel" and target-planet = nobody [ report false ]
+  if mode != "travel" and target-planet != nobody [ report false ]
+  if mode = "detained" and not in-range? wait-ticks 1 5 [ report false ]
+  if mode != "detained" and wait-ticks != 0 [ report false ]
   if target-planet = nobody [ report mode = "idle" or mode = "detained" ]
   if not is-planet? target-planet [ report false ]
   report not [foundation?] of target-planet
 end
 
 to-report missionary-state-valid?
-  if mode = "travel" and target-planet = nobody [ report false ]
-  if mode != "travel" and target-planet != nobody [ report false ]
-  if mode = "detained" and not in-range? wait-ticks 1 5 [ report false ]
-  if mode != "detained" and wait-ticks != 0 [ report false ]
   report destination-valid? and is-planet? home-planet and in-range? mission-skill 0.75 1.25
 end
 
 to-report trader-state-valid?
+  if mode = "travel" and target-planet = origin-planet [ report false ]
   report destination-valid? and is-planet? origin-planet and
     in-range? trade-skill 0.75 1.25 and in-range? cargo 0 1
 end
@@ -704,7 +856,7 @@ view-mode
 @#$#@#$#@
 ## WHAT IS IT?
 
-A Foundation-inspired study of non-military influence through missionary visits.
+A Foundation-inspired study of non-military influence through missions and trade.
 The world contains Terminus, four kingdoms of five planets each, and ten
 independent markets. The period and star map are fictional abstractions.
 
@@ -712,12 +864,16 @@ independent markets. The period and star map are fictional abstractions.
 
 Click setup to create a new galaxy. go-once advances one tick; go runs to 450.
 All planets remain stationary. Missionaries depart from Terminus, travel between
-worlds, and attempt to spread Scientism. Traders remain idle. Trading, passive
-technology maintenance, government decisions and recruitment are not active yet.
+worlds, and attempt to spread Scientism. Traders negotiate sales and establish
+trading relationships. Passive technology maintenance, government decisions
+and recruitment are not active yet.
 
 The two initial-count sliders set starting populations. missionary-effectiveness
-scales conversion; royal-intolerance lowers admission and raises execution risk.
-The other four sliders reserve parameters for subsequent behavior. view-mode changes
+scales conversion; royal-intolerance lowers missionary admission and raises
+execution risk for both visitor types. trade-attractiveness scales sales, and
+religion-trade-weight sets religion's contribution to trader admission.
+tech-decay-rate and independence-effort are reserved for later environmental
+behavior. view-mode changes
 planet color only: kingdom, religion, dependency or control. Terminus is always
 a gold star; capitals are ringed and labeled. Cyan arrows represent missionaries
 and white squares represent traders; agents at the same location overlap.
@@ -745,6 +901,49 @@ ticks. Survivors then choose another world. Deaths are not replaced yet.
 total-successful-missions, total-rejected-missions and
 total-executed-missionaries are cumulative since setup. Planet failed-visits
 counts rejections. Missionary activity produces no trade income or routes.
+
+## TRADERS AND ROUTES
+
+Traders also explore uniformly with probability .15; otherwise they choose
+destinations with weight (.05 + admission probability) * (.25 + demand) *
+(1 + .75 * existing-direct-route-indicator) / (1 + distance / 16).
+Terminus and the trader's current planet are excluded. Traders arrive at planet
+centers using toroidal shortest paths. Speed is 1.5 units/tick, or 2.25 if the
+direct origin-destination route exists with strength >= .15. A route may fade
+during travel; the speed is checked again each tick. Weak remnants retain the
+targeting preference but provide no speed bonus. Unconnected worlds remain reachable.
+
+Admission probability is clamped to [.02,.95]:
+.10 + religion-trade-weight * religion + .25 * tech-demand + .15 * trade-trust
+- .40 * hostility - .30 * taboo - .20 if restricted - .45 if embargoed.
+Religion improves admission but is never a prerequisite. Rejection causes
+detention or execution using the same rule as missionary rejection. Each
+arrival resolves once. Surviving traders depart from the visited world.
+
+For an accepted visit, sale-size = trade-attractiveness * trade-skill. A sale
+adds .11 * sale-size to dependency, .12 * sale-size to health, .09 * sale-size
+to trust, subtracts .15 * sale-size from demand, and adds 3 * sale-size to
+wealth. Normalized values are clamped to [0,1], wealth to [0,100]. Trading
+does not convert religion or construct temples. Cargo is an abstract per-visit
+capacity of 1, consumed on acceptance and restored on departure, not an
+inventory or an upper bound on sale-size. Skill is sampled in [.75,1.25).
+
+Revenue of 12 * sale-size credits is booked once to treasury, current-tick
+income and cumulative profit. Planet wealth is a net development benefit after
+payment, not a conserved cash account. Initial travelers are free, with no
+upkeep or replacement spending yet, so current cumulative profit equals revenue.
+total-successful-trades and planet successful-trades count accepted visits,
+including zero-size admissions. At trade-attractiveness = 0, acceptance changes
+these counters only: no revenue, market-state change or route reinforcement.
+Planet failed-visits counts rejected missions and trades together.
+
+A positive sale creates an undirected route between departure and destination
+at strength .35 and age 0; later sales on either direction add .20 * sale-size,
+clamped to 1. Age counts ticks since creation and is not reset by reinforcement.
+After all traders act, each route loses .002 strength and ages once, including
+new routes. Routes below .08 are deleted. Strong links are brighter and thicker;
+styling changes neither state nor randomness. active-trade-links counts all
+remaining relationships, including weak remnants.
 
 ## INITIALIZATION
 
