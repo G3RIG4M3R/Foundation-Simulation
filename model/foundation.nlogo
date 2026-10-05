@@ -8,7 +8,7 @@ planets-own [
   population religion tech-dependency trade-trust
   tech-demand tech-health wealth hostility taboo baseline-hostility
   temple? embargoed? policy control-streak controlled?
-  successful-trades failed-visits
+  successful-trades failed-visits previous-policy-wealth
 ]
 missionaries-own [target-planet home-planet mission-skill mode wait-ticks]
 traders-own [target-planet origin-planet trade-skill mode cargo wait-ticks]
@@ -31,6 +31,7 @@ to setup
   setup-foundation
   setup-kingdoms
   setup-planets
+  initialize-policy-wealth
   setup-agents
   reset-ticks
   update-appearance
@@ -184,7 +185,41 @@ to go-once
 end
 
 to process-environment
-  ;; TODO Stage 4: demand, infrastructure, substitution and wealth.
+  ;; Local deterministic updates: demand uses incoming health; wear uses incoming
+  ;; dependency; substitution uses incoming wealth; the economy uses updated state.
+  ;; Sorting avoids spending RNG on independent environmental updates.
+  foreach sort planets with [not foundation?] [ world ->
+    ask world [ update-planet-economy ]
+  ]
+end
+
+to update-planet-economy
+  set tech-demand clamp01 (tech-demand + 0.006 + 0.01 * (1 - tech-health))
+  let maintenance ifelse-value
+    (temple? and religion >= 0.60 and policy != "embargo") [0.008] [0]
+  ;; Combine wear and its maintenance offset before clipping at either boundary.
+  set tech-health clamp01 (tech-health -
+    tech-decay-rate * (0.30 + 0.70 * tech-dependency) + maintenance)
+  set tech-dependency clamp01 (tech-dependency -
+    0.006 * independence-effort * (0.2 + wealth / 100))
+  ifelse technology-crisis? [
+    set wealth clamp-range (wealth - (0.5 + tech-dependency) * (0.5 - tech-health)) 0 100
+  ] [
+    set wealth clamp-range (wealth + 0.02 * tech-health) 0 100
+  ]
+  set trade-trust clamp01 (trade-trust - 0.001)
+  ;; Routes decay separately after traders, exactly once per tick.
+end
+
+to initialize-policy-wealth
+  ;; Bounded baseline for Stage 5. Policy decisions will compare against it,
+  ;; then replace it; environmental updates must not overwrite prior wealth.
+  foreach sort planets [ world -> ask world [ set previous-policy-wealth wealth ] ]
+  foreach sort planets with [capital?] [ capital ->
+    let group [kingdom-id] of capital
+    let baseline population-weighted-wealth (planets with [kingdom-id = group])
+    ask capital [ set previous-policy-wealth baseline ]
+  ]
 end
 
 to process-missionaries
@@ -546,6 +581,39 @@ to-report mean-dependency
   report mean map [world -> [tech-dependency] of world] worlds
 end
 
+to-report mean-tech-health
+  let worlds sort planets with [not foundation?]
+  if empty? worlds [ report 0 ]
+  report mean map [world -> [tech-health] of world] worlds
+end
+
+to-report mean-tech-demand
+  let worlds sort planets with [not foundation?]
+  if empty? worlds [ report 0 ]
+  report mean map [world -> [tech-demand] of world] worlds
+end
+
+to-report mean-wealth
+  let worlds sort planets with [not foundation?]
+  if empty? worlds [ report 0 ]
+  report mean map [world -> [wealth] of world] worlds
+end
+
+to-report technology-crisis?
+  report tech-dependency > 0.45 and tech-health < 0.50
+end
+
+to-report technology-crisis-planets
+  report count planets with [not foundation? and technology-crisis?]
+end
+
+to-report population-weighted-wealth [worlds]
+  let ordered sort worlds
+  let weight sum map [world -> [population] of world] ordered
+  if weight <= 0 [ report 0 ]
+  report (sum map [world -> [population * wealth] of world] ordered) / weight
+end
+
 to-report active-trade-links
   ;; Counts all extant relationships, including weak remnants below speed threshold.
   report count trade-routes
@@ -605,6 +673,7 @@ to-report planet-state-valid?
   if not natural-number? kingdom-id or kingdom-id > 5 [ report false ]
   if not in-range? population 0.5 1.5 [ report false ]
   if not in-range? wealth 0 100 [ report false ]
+  if not in-range? previous-policy-wealth 0 100 [ report false ]
   if not empty? filter [value -> not in-range? value 0 1] (list
     religion tech-dependency trade-trust tech-demand tech-health hostility taboo baseline-hostility
   ) [ report false ]
@@ -865,15 +934,16 @@ independent markets. The period and star map are fictional abstractions.
 Click setup to create a new galaxy. go-once advances one tick; go runs to 450.
 All planets remain stationary. Missionaries depart from Terminus, travel between
 worlds, and attempt to spread Scientism. Traders negotiate sales and establish
-trading relationships. Passive technology maintenance, government decisions
-and recruitment are not active yet.
+trading relationships. Infrastructure wears, demand regenerates, and domestic
+substitution reduces dependency. Government decisions and recruitment are not
+active yet; policies can be forced manually for causal tests.
 
 The two initial-count sliders set starting populations. missionary-effectiveness
 scales conversion; royal-intolerance lowers missionary admission and raises
 execution risk for both visitor types. trade-attractiveness scales sales, and
 religion-trade-weight sets religion's contribution to trader admission.
-tech-decay-rate and independence-effort are reserved for later environmental
-behavior. view-mode changes
+tech-decay-rate sets infrastructure wear; independence-effort scales gradual
+domestic substitution. view-mode changes
 planet color only: kingdom, religion, dependency or control. Terminus is always
 a gold star; capitals are ringed and labeled. Cyan arrows represent missionaries
 and white squares represent traders; agents at the same location overlap.
@@ -944,6 +1014,38 @@ After all traders act, each route loses .002 strength and ages once, including
 new routes. Routes below .08 are deleted. Strong links are brighter and thicker;
 styling changes neither state nor randomness. active-trade-links counts all
 remaining relationships, including weak remnants.
+
+## TECHNOLOGY AND ECONOMY
+
+At the beginning of each tick, each external planet updates locally in this order:
+1. Demand rises by .006 + .01 * (1 - incoming health).
+2. Health loses tech-decay-rate * (.30 + .70 * incoming dependency). A temple
+   offsets .008 only at religion >= .60 and policy other than embargo. Wear
+   and maintenance are combined before clamping. Accepted missionary repairs
+   and trader replenishment occur later in the tick.
+3. Dependency falls by .006 * independence-effort * (.2 + incoming wealth / 100).
+   Zero effort disables substitution. It does not cost extra wealth in this
+   abstraction; no industrial production chain or investment budget is modeled.
+4. If updated dependency > .45 and health < .50, wealth loses
+   (.5 + dependency) * (.5 - health); otherwise it recovers .02 * health.
+5. Trade trust falls by .001. Route wear runs separately after trading.
+
+Normalized states remain in [0,1] and wealth in [0,100]. Terminus is exempt.
+Embargo has no instantaneous wealth penalty: missing maintenance and fewer
+sales cause deterioration, which can trigger a delayed economic crisis.
+Reopening alone cannot instantly repair infrastructure. Substitution can end
+the dependency crisis even with poor health; wealth recovery then remains slow.
+Religion does not directly create or remove dependency. Secular planets can
+become dependent through successful sales; religious influence and trade trust
+remain separate attributes.
+
+mean-tech-health, mean-tech-demand and mean-wealth are unweighted external-world
+means; technology-crisis-planets counts external worlds meeting both crisis
+conditions. mean-religion and mean-dependency likewise exclude Terminus. These
+pure reporters support Command Center and BehaviorSpace observations.
+previous-policy-wealth holds the initial population-weighted kingdom wealth on
+capitals and initial local wealth elsewhere. It stays fixed until Stage 5 adds
+policy decisions that compare and refresh it; no growing history is retained.
 
 ## INITIALIZATION
 
