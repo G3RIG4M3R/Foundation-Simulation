@@ -646,18 +646,32 @@ to style-planet
   set shape ifelse-value capital? ["capital"] ["planet"]
   set size ifelse-value capital? [2.2] [1.6]
   set label-color white
+  let policy-mark ifelse-value (policy = "open") [""] [
+    ifelse-value (policy = "restrict") ["R"] ["E"] ]
+  set label policy-mark
+  if capital? [
+    set label item (kingdom-id - 1) ["Anacreon" "Smyrno" "Konom" "Daribow"]
+    if policy-mark != "" [ set label (word label " [" policy-mark "]") ]
+  ]
   if view-mode = "kingdom" [
     set color item kingdom-id [45 15 105 65 125 5]
   ]
-  ;; Retain a visible tint at zero instead of hiding low values in black space.
-  if view-mode = "religion" [ set color scale-color green religion -0.4 1 ]
+  ;; Red -> amber -> green with a monotonic hue; no RNG or state feedback.
+  if view-mode = "religion" [ set color religion-color religion ]
   if view-mode = "dependency" [ set color scale-color sky tech-dependency -0.4 1 ]
   if view-mode = "control" [ set color ifelse-value controlled? [green] [gray] ]
   if foundation? [
+    set label "Terminus"
     set shape "foundation"
     set color yellow
     set size 3
   ]
+end
+
+to-report religion-color [level]
+  let fraction clamp01 level
+  if fraction <= 0.5 [ report (list 220 (70 + 280 * fraction) 60) ]
+  report (list (220 - 320 * (fraction - 0.5)) 210 60)
 end
 
 ;; PURE STATE REPORTERS
@@ -872,14 +886,312 @@ to assert-valid-model-state
   if not model-valid? [ error "Invalid galaxy, agent state, counters or clock." ]
 end
 @#$#@#$#@
-GRAPHICS-WINDOW
-320
+TEXTBOX
 10
-840
-531
+10
+1220
+42
+FOUNDATION  /  Religion, trade & control
+22
+0
+0
+
+TEXTBOX
+10
+44
+1210
+65
+Indirect influence across 30 external worlds. No conquest; control can be lost.
+12
+0
+0
+
+BUTTON
+10
+80
+98
+113
+setup
+setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+104
+80
+194
+113
+go-once
+go-once
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+200
+80
+290
+113
+go
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+TEXTBOX
+10
+123
+290
+143
+MISSIONS
+13
+0
+0
+
+SLIDER
+10
+147
+290
+180
+initial-missionaries
+initial-missionaries
+0
+40
+12
+2
+1
+NIL
+HORIZONTAL
+
+SLIDER
+10
+184
+290
+217
+missionary-effectiveness
+missionary-effectiveness
+0
+0.5
+0.25
+0.05
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+10
+226
+290
+246
+TRADE
+13
+0
+0
+
+SLIDER
+10
+250
+290
+283
+initial-traders
+initial-traders
+0
+40
+12
+2
+1
+NIL
+HORIZONTAL
+
+SLIDER
+10
+287
+290
+320
+trade-attractiveness
+trade-attractiveness
+0
+1
+0.6
+0.05
+1
+NIL
+HORIZONTAL
+
+SLIDER
+10
+324
+290
+357
+religion-trade-weight
+religion-trade-weight
+0
+0.8
+0.55
+0.05
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+10
+365
+290
+385
+KINGDOM POLITICS
+13
+0
+0
+
+SLIDER
+10
+389
+290
+422
+royal-intolerance
+royal-intolerance
+0
+1
+0.5
+0.05
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+10
+429
+290
+460
+Higher intolerance lowers tolerance for influence.
+11
+0
+0
+
+TEXTBOX
+10
+466
+290
+486
+ECONOMY
+13
+0
+0
+
+SLIDER
+10
+490
+290
+523
+tech-decay-rate
+tech-decay-rate
+0
+0.04
+0.015
+0.005
+1
+NIL
+HORIZONTAL
+
+SLIDER
+10
+527
+290
+560
+independence-effort
+independence-effort
+0
+1
+0.15
+0.05
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+10
+570
+290
+590
+VISUALIZATION
+13
+0
+0
+
+CHOOSER
+10
+594
+290
+639
+view-mode
+view-mode
+"kingdom" "religion" "dependency" "control"
+0
+
+BUTTON
+10
+646
+145
+679
+refresh view
+update-appearance
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+TEXTBOX
+154
+646
+290
+680
+Refresh when paused;\nno tick advances.
+11
+0
+0
+
+TEXTBOX
+10
+692
+290
+755
+Cyan arrows: missionaries\nWhite squares: traders\nR = restrict; E = embargo\nBlue routes: stronger = thicker
+12
+0
+0
+
+GRAPHICS-WINDOW
+310
+80
+766
+537
 -1
 -1
-8.0
+7.0
 1
 10
 1
@@ -899,214 +1211,404 @@ GRAPHICS-WINDOW
 ticks
 30.0
 
-BUTTON
-10
-10
-100
-43
-setup
-setup
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-108
-10
-198
-43
-go-once
-go-once
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-206
-10
-296
-43
-go
-go
-T
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-SLIDER
-10
-60
-300
-93
-initial-missionaries
-initial-missionaries
+MONITOR
+310
+550
+418
+595
+Tick
+ticks
 0
-40
-12.0
+1
+11
+
+MONITOR
+424
+550
+532
+595
+Worlds / 30
+controlled-planets
+0
+1
+11
+
+MONITOR
+538
+550
+646
+595
+Kingdoms / 4
+controlled-kingdoms
+0
+1
+11
+
+MONITOR
+652
+550
+760
+595
+Routes
+count trade-routes
+0
+1
+11
+
+MONITOR
+310
+602
+418
+647
+Religion
+mean-religion
+3
+1
+11
+
+MONITOR
+424
+602
+532
+647
+Dependency
+mean-dependency
+3
+1
+11
+
+MONITOR
+538
+602
+646
+647
+Treasury (cr.)
+foundation-treasury
 2
 1
-NIL
-HORIZONTAL
+11
 
-SLIDER
-10
-105
-300
-138
-missionary-effectiveness
-missionary-effectiveness
+MONITOR
+652
+602
+760
+647
+Executions
+total-executed-missionaries + total-executed-traders
 0
-0.5
-0.25
-0.05
 1
-NIL
-HORIZONTAL
+11
 
-SLIDER
-10
-150
-300
-183
-initial-traders
-initial-traders
+MONITOR
+310
+654
+418
+699
+Restricted
+count planets with [not foundation? and policy = "restrict"]
 0
-40
-12.0
+1
+11
+
+MONITOR
+424
+654
+532
+699
+Embargoed
+count planets with [not foundation? and embargoed?]
+0
+1
+11
+
+MONITOR
+538
+654
+646
+699
+Tech crises
+technology-crisis-planets
+0
+1
+11
+
+MONITOR
+652
+654
+760
+699
+Wealth [0-100]
+mean-wealth
 2
 1
-NIL
-HORIZONTAL
+11
 
-SLIDER
-10
-195
-300
-228
-trade-attractiveness
-trade-attractiveness
+TEXTBOX
+310
+711
+770
+731
+RELIGION: 0 red  ->  0.5 amber  ->  1 green
+11
 0
-1
-0.6
-0.05
-1
-NIL
-HORIZONTAL
-
-SLIDER
-10
-240
-300
-273
-royal-intolerance
-royal-intolerance
-0
-1
-0.5
-0.05
-1
-NIL
-HORIZONTAL
-
-SLIDER
-10
-285
-300
-318
-tech-decay-rate
-tech-decay-rate
-0
-0.04
-0.015
-0.005
-1
-NIL
-HORIZONTAL
-
-SLIDER
-10
-330
-300
-363
-religion-trade-weight
-religion-trade-weight
-0
-0.8
-0.55
-0.05
-1
-NIL
-HORIZONTAL
-
-SLIDER
-10
-375
-300
-408
-independence-effort
-independence-effort
-0
-1
-0.15
-0.05
-1
-NIL
-HORIZONTAL
-
-CHOOSER
-10
-425
-300
-470
-view-mode
-view-mode
-"kingdom" "religion" "dependency" "control"
 0
 
+TEXTBOX
+310
+733
+770
+753
+DEPENDENCY: dark to light blue. CONTROL: green / gray.
+11
+0
+0
+
+TEXTBOX
+310
+755
+770
+780
+Gold star = Terminus; rings = capitals. R / E = policy.
+11
+0
+0
+
+PLOT
+790
+80
+1170
+235
+Control over time
+ticks
+worlds / 30
+0.0
+450.0
+0.0
+30.0
+false
+false
+"" ""
+PENS
+"controlled-planets" 1.0 0 -10899396 true "" "plotxy ticks controlled-planets"
+
+PLOT
+790
+246
+1170
+401
+Religion and dependency
+ticks
+mean [0 - 1]
+0.0
+450.0
+0.0
+1.0
+false
+true
+"" ""
+PENS
+"mean-religion" 1.0 0 -10899396 true "" "plotxy ticks mean-religion"
+"mean-dependency" 1.0 0 -13791810 true "" "plotxy ticks mean-dependency"
+
+PLOT
+790
+412
+1170
+567
+Religion distribution
+religion (0 - 1)
+worlds
+0.0
+1.0
+0.0
+30.0
+false
+false
+"set-plot-pen-interval 0.1" ""
+PENS
+"worlds" 1.0 1 -10899396 true "" "histogram map [value -> min (list value (1 - 1.0E-12))] (map [world -> [religion] of world] sort planets with [not foundation?])"
+
+PLOT
+790
+578
+1170
+733
+Trade economy
+ticks
+credits / tick
+0.0
+450.0
+0.0
+10.0
+false
+false
+"" "set-plot-y-range 0 max (list 10 plot-y-max (10 * ceiling (trade-income-this-tick / 10)))"
+PENS
+"gross trade income" 1.0 0 -13791810 true "" "plotxy ticks trade-income-this-tick"
+
+TEXTBOX
+790
+744
+1170
+768
+Histogram: 10 bins; last bin includes religion = 1.
+11
+0
+0
 @#$#@#$#@
 ## WHAT IS IT?
 
-A Foundation-inspired study of non-military influence through missions and trade.
-The world contains Terminus, four kingdoms of five planets each, and ten
-independent markets. The period and star map are fictional abstractions.
+How can the Foundation gain and retain non-military influence through Scientism,
+technology and trade when independent governments can resist it? This original
+agent-based model explores that question using 30 external worlds and Terminus.
+Religion can help traders enter markets; trade creates dependency, while repression
+can reduce influence and eventually damage an already-dependent economy. These
+feedbacks may produce expansion, resistance or failure. A tipping point is a
+hypothesis to investigate, not a guaranteed result or historical prediction.
 
 ## HOW TO USE IT
 
-Click setup to create a new galaxy. go-once advances one tick; go runs to 450.
-All planets remain stationary. Missionaries depart from Terminus, travel between
-worlds, and attempt to spread Scientism. Traders negotiate sales and establish
-trading relationships. Infrastructure wears, demand regenerates, and domestic
-substitution reduces dependency. Governments respond to influence and economic
-crises; the Foundation can pay to replace lost travelers.
+1. Open this file in NetLogo 6.4.x. Choose slider settings, then click **setup**.
+   The saved defaults create 12 missionaries and 12 traders, with 31 planets.
+2. Click **go-once** to advance exactly one tick. Click **go** to run continuously;
+   click it again to pause. Every run stops at tick 450. At that limit, neither
+   button advances the model; click setup to begin again.
+3. Watch the map, monitors and plots. Choose a view under **view-mode**.
+   While paused, click **refresh view** to redraw without advancing time. During
+   a run the view refreshes each tick. Colors and charts do not change outcomes.
+4. To repeat the same run, enter `random-seed 123 setup` in the Command Center
+   with the same slider settings, then run go. Setup never chooses a fixed seed
+   automatically. Use different seeds to study variation.
 
-The two initial-count sliders set starting populations. missionary-effectiveness
-scales conversion; royal-intolerance lowers missionary admission and raises
-execution risk for both visitor types. trade-attractiveness scales sales, and
-religion-trade-weight sets religion's contribution to trader admission.
-tech-decay-rate sets infrastructure wear; independence-effort scales gradual
-domestic substitution. view-mode changes
-planet color only: kingdom, religion, dependency or control. Terminus is always
-a gold star; capitals are ringed and labeled. Cyan arrows represent missionaries
-and white squares represent traders; agents at the same location overlap.
+Setup clears travelers, routes, counters, control streaks and plots and resets
+time and treasury. It preserves your chosen sliders and view. Saved widget
+settings are the defaults below. Sliders can also change during a run: rate
+changes affect subsequent actions; the two population sliders become recruitment
+targets. Lowering a target does not kill living agents. For comparisons, hold
+settings fixed within each run and set them before setup.
 
-## MISSIONARY RULES
+### Parameters (widget names and meanings)
+
+- **initial-missionaries** (missionaries: initial / target): 0–40 in steps of 2;
+  default 12. Free initial missionaries and the desired living count thereafter.
+- **missionary-effectiveness** (conversion effectiveness): 0–0.5 in steps of
+  0.05; default 0.25. Scales conversion on accepted missions, not entry chance.
+- **initial-traders** (traders: initial / target): 0–40 in steps of 2; default 12. Free initial traders and the desired living count thereafter.
+- **trade-attractiveness** (technology attractiveness): 0–1 in steps of 0.05;
+  default 0.60. Scales sale size, benefits, dependency and revenue.
+- **religion-trade-weight** (religion effect on trade): 0–0.8 in steps of 0.05;
+  default 0.55. Religion's positive contribution to trader entry probability.
+- **royal-intolerance** (royal intolerance): 0–1 in steps of 0.05; default
+  0.50. Higher values reduce missionary entry, increase execution risk and lower
+  the government's threshold for restricting Foundation influence.
+- **tech-decay-rate** (technology wear / tick): 0–0.04 in steps of 0.005;
+  default 0.015. Scales dependency-sensitive infrastructure wear.
+- **independence-effort** (domestic substitution effort): 0–1 in steps of
+  0.05; default 0.15. Scales gradual replacement by domestic alternatives.
+
+### Reading the map and statistics
+
+Terminus is always a gold star. Ringed worlds are capitals. Cyan arrows are
+missionaries; white outlined squares are traders in every view. Travelers may
+overlap on a planet. Blue routes grow brighter and thicker with strength.
+Labels **R** and **E** mean restriction and embargo; a capital's label applies
+to its entire kingdom. Unmarked worlds are open. Right-click a planet and inspect
+its state for religion, dependency, hostility, policy, health and control streak.
+
+- **kingdom**: Anacreon red, Smyrno blue, Konom green, Daribow purple; independent
+  worlds gray. These identities remain fixed even when influence changes.
+- **religion**: red at 0, amber at 0.5, green at 1; this is local Scientism
+  influence, not a headcount of worshippers.
+- **dependency**: dark to light blue from 0 to 1; brighter worlds depend more
+  heavily on Foundation technology, regardless of religious belief.
+- **control**: green means current effective control, gray means uncontrolled.
+  Capitals retain rings, and Terminus is excluded from external control counts.
+
+**Worlds / 30** counts worlds sustaining sufficient leverage for five ticks.
+**Kingdoms / 4** also requires a controlled capital and a population-weighted
+controlled share of at least 60%. Religion and dependency monitors are unweighted
+means of the 30 external worlds on a 0–1 scale. Treasury is available credits;
+executions are cumulative losses of both visitor breeds, not all rejected visits.
+Routes count all live trade links. Restricted and embargoed monitors count worlds,
+not governments. Technology crises count dependent worlds with damaged technology;
+wealth is the external mean on a 0–100 scale.
+
+**Control over time** plots external controlled worlds (0–30). **Religion and
+dependency** plots both means on the same 0–1 scale. **Religion distribution** is
+a fresh histogram of 30 worlds at each tick, using ten bins of width 0.1. The
+last bin includes religion exactly 1 (the plotted input is nudged below 1 solely
+to accommodate NetLogo's exclusive upper histogram bound; state is unchanged).
+**Trade economy** shows gross sales credits earned during each tick, not treasury
+or net profit. Its vertical scale expands to fit observed income. All plots reset
+at setup, include the initial state and update once per tick. Monitors round only
+the displayed values. BehaviorSpace can run with plot updates disabled; plotting
+is not part of any decision rule.
+
+## HOW IT WORKS
+
+### ODD overview: purpose, entities and state
+
+The purpose is to study indirect, reversible influence under political resistance.
+The model has three breeds: stationary planets, traveling missionaries and traveling
+traders, plus undirected trade routes. Empty patches are space. Terminus is the
+Foundation's home; Anacreon, Smyrno, Konom and Daribow each contain five planets,
+including one capital. Ten outer worlds have independent local governments.
+
+Each planet stores population weight, religion, technology dependency, trust,
+demand, infrastructure health, wealth, hostility, taboo, temple presence, policy,
+embargo status and control persistence. Normalized attributes are in [0,1]; wealth
+is [0,100]. Capitals retain a previous wealth snapshot and policy timing. Travelers
+store skill, destination, mode and detention time; traders also store origin and
+transaction capacity. Routes store strength and age. Global accounts track
+Foundation treasury, gross tick income, net cumulative profit, visits, executions
+and paid recruits. Population weights are fixed, not simulated individual people.
+
+### Process overview and scheduling
+
+Space is a 64 by 64 grid wrapping on both axes. One tick is an abstract interval,
+not a day or year. Each tick applies environmental updates, missionary actions,
+trader actions and route wear. At ticks 0, 10, 20, ... governments decide and the
+Foundation recruits. Local political effects then update religion and hostility,
+control is evaluated, appearance refreshes and the clock advances once. Plots
+observe the resulting state. Agent execution order within each traveling breed is
+randomized; governments and deterministic display updates use stable ordering.
+
+### Design concepts
+
+**Emergence:** routes, religious persistence, dependence, resistance and control
+arise from visits and local feedback, without a timetable of historical events.
+**Sensing:** travelers use observable destination attitudes, distance and route
+access, not knowledge of future random outcomes. Governments aggregate their own
+planets' current state and compare wealth with the preceding decision.
+**Interaction:** missions convert and sometimes repair; sales replenish technology,
+build trust and dependency, and connect markets. Government policies alter access,
+repression and maintenance. There is no contagious neighbor-to-neighbor conversion.
+**Stochasticity:** initial states and visitor skills are sampled; destinations,
+admission, execution and detention are random using NetLogo's seeded RNG.
+**Adaptation:** governments respond to threats and measured economic crises;
+travelers reselect destinations with fixed choice rules. There is no learning or
+strategic optimization. **Observation:** plots and monitors expose current state
+without affecting it. Repeated seeds are needed to distinguish patterns from chance.
+
+### Initialization and input data
+
+No external data or extensions are required. Setup samples a new galaxy with
+31 distinct stationary worlds at least three toroidal units apart. Capitals lie
+at (+/-18, +/-18), their neighbors within six units, and independent worlds outside
+eight-unit capital buffers. Placement retries are bounded. Kingdom membership is
+fixed. All policies start open; no routes or controlled worlds exist initially.
+Terminus starts with religion/trust/health 1, wealth 100, a temple, and no dependency.
+Treasury starts at 200; initial travelers are free and depart from Terminus.
+
+External uniform ranges are religion [.02,.20), dependency [0,.08), trust [0,.10),
+health [.65,.90), demand [.40,.80), wealth [40,80), taboo [0,.35), population [.5,1.5).
+Kingdom hostility baselines are .60, .25, .50 and .40 respectively, with +/- .10
+jitter; independent hostility is [.15,.80). These are scenario assumptions,
+not canonical or measured historical facts. Visitor skill is uniform [.75,1.25).
+
+### Submodels
+
+### Missionaries
 
 Each missionary selects a world other than Terminus or its current planet:
 15% uniform exploration, otherwise a weighted random choice favoring admission,
@@ -1130,7 +1632,7 @@ total-successful-missions, total-rejected-missions and
 total-executed-missionaries are cumulative since setup. Planet failed-visits
 counts rejections. Missionary activity produces no trade income or routes.
 
-## TRADERS AND ROUTES
+### Traders and routes
 
 Traders also explore uniformly with probability .15; otherwise they choose
 destinations with weight (.05 + admission probability) * (.25 + demand) *
@@ -1173,7 +1675,7 @@ new routes. Routes below .08 are deleted. Strong links are brighter and thicker;
 styling changes neither state nor randomness. active-trade-links counts all
 remaining relationships, including weak remnants.
 
-## TECHNOLOGY AND ECONOMY
+### Technology and economy
 
 At the beginning of each tick, each external planet updates locally in this order:
 1. Demand rises by .006 + .01 * (1 - incoming health).
@@ -1206,7 +1708,7 @@ wealth on capitals (initialized during setup). Decisions compare before refreshi
 this snapshot; no growing history is retained. Other planets retain initial local
 wealth, with no independent-world crisis concession in this version.
 
-## GOVERNMENT, REPRESSION AND CONTROL
+### Government, repression and control
 
 The full tick order is environment, missionaries, traders, route wear, periodic
 policies/recruitment, local political effects, control, appearance, then tick.
@@ -1257,29 +1759,65 @@ Cumulative total-recruited-missionaries, total-recruited-traders and recruitment
 support exact population and financial audits. Treasury equals 200 plus cumulative
 trade profit under ordinary simulation; current-tick trade income is gross sales.
 
-## INITIALIZATION
 
-The 64 by 64 grid wraps horizontally and vertically. Kingdom capitals lie at
-(+/-18, +/-18); other kingdom planets are within six patches of their capital.
-Independent planets lie beyond eight patches from every capital. All planets
-are at least three toroidal distance units apart. IDs are explicit attributes,
-independent of turtle creation order. Placement stops with an error after
-1000 unsuccessful attempts for a planet.
+## THINGS TO NOTICE / TRY
 
-External state is sampled uniformly within the specified ranges: religion
-[.02,.20), dependency [0,.08), trust [0,.10), health [.65,.90), demand [.40,.80),
-wealth [40,80), taboo [0,.35), and population [.5,1.5). Kingdom hostility is
-its baseline plus jitter [-.10,.10); independent hostility is [.15,.80).
-The Foundation treasury starts at 200 credits; initial travelers are free.
+Compare several seeds at low versus high royal intolerance while holding other
+settings fixed. Observe religious influence, trade and control separately: a
+religious world need not be controlled, and secular trade can create dependency.
+Default runs can fail to expand; this is a possible outcome, not a blank display.
 
-For repeatable initialization, enter random-seed 42 setup in the Command Center.
-setup does not reset the seed itself. Colors do not consume random numbers.
+Set missionaries to zero before setup to observe secular trade. Set traders to
+zero to observe religion without new commercial dependency and recruitment costs
+without trade revenue. Set both counts to zero to isolate environmental change.
+Try 40 of each visitor, effectiveness .5, attractiveness 1, intolerance 0,
+independence effort 0 and wear .005 as a favorable comparison; success is not
+promised for every seed. Restore defaults before comparing default runs.
 
-## CREDITS
+Watch dependent worlds under E labels: their wealth does not drop instantly when
+sanctioned. Missing support can damage infrastructure and later trigger a crisis.
+An economic concession reopens access but gives no immediate repair or wealth.
+Increase independence effort to compare gradual domestic substitution. Follow a
+capital's policy, wealth memory and cooldown in its inspector. Do not infer a
+universal threshold or historical conclusion from one stochastic run.
 
-Original model, inspired by Isaac Asimov's Foundation. Developed for Collective
-Intelligence, Autumn 2026, assignment by Tamás Takács. Source license: MIT,
-Copyright (c) 2026 G3RIG4M3R. No Models Library simulation code is used.
+## SIMPLIFICATIONS AND LIMITATIONS
+
+The star map is fictional and early Foundation periods are deliberately blended.
+There are no individual worshippers, population dynamics, fleets, warfare or
+formal annexation. Toroidal travel is a modeling device, not astrophysical distance.
+Credits and wealth are abstract, with no empirical fitting or conserved economy.
+Planet sale benefits are net development benefits after payment; initial travelers
+are free, there is no upkeep, cargo renews between visits, and domestic substitution
+has no explicit investment cost. Government differences use initial hostility,
+not historical scripts. The fixed leverage weights and persistence threshold define
+effective influence, not legal sovereignty, and may be tested as assumptions in
+future work. The model does not implement psychohistory or predict real politics.
+
+## EXTENDING THE MODEL
+
+Possible future work includes an adaptive balance between religious and commercial
+strategies, richer government heterogeneity, explicit investment in domestic
+industry, and supply or inventory constraints on the trade network. None of these
+mechanisms is implemented here. Compare extensions against the present model with
+recorded settings, seeds, uncertainty and independently tested rules.
+
+## CREDITS / REFERENCES
+
+Original model, inspired by Isaac Asimov's *Foundation* (1951) as literary
+inspiration, not quantitative evidence. Developed for Collective Intelligence,
+Autumn 2026, assignment by Tamás Takács. The assignment is credited to Tamás Takács
+(2026), CC BY-NC-ND 4.0. Source license: MIT, Copyright (c) 2026 G3RIG4M3R.
+No Models Library simulation logic is used. Development used AI assistance for
+code, documentation and verification; the student must review and understand the
+model and follow any additional course disclosure requirements.
+
+NetLogo: Wilensky, U. (1999), *NetLogo*. Center for Connected Learning and
+Computer-Based Modeling, Northwestern University, Evanston, IL.
+[NetLogo](https://ccl.northwestern.edu/netlogo/),
+[NetLogo documentation](https://docs.netlogo.org/), and the bundled NetLogo 6.4.0
+User Manual (Interface, Programming Guide / Plotting, Dictionary and BehaviorSpace).
+Use this model with NetLogo 6.4.x; later file formats are not required.
 @#$#@#$#@
 default
 true
