@@ -9,6 +9,7 @@ planets-own [
   tech-demand tech-health wealth hostility taboo baseline-hostility
   temple? embargoed? policy control-streak controlled?
   successful-trades failed-visits previous-policy-wealth
+  last-policy-change-tick policy-cooldown-until
 ]
 missionaries-own [target-planet home-planet mission-skill mode wait-ticks]
 traders-own [target-planet origin-planet trade-skill mode cargo wait-ticks]
@@ -20,6 +21,7 @@ globals [
   total-rejected-missions total-successful-missions
   total-rejected-trades total-successful-trades
   kingdom-policy-timer tick-limit terminus-planet
+  total-recruited-missionaries total-recruited-traders last-recruitment-tick
 ]
 
 ;; INITIALIZATION
@@ -27,6 +29,7 @@ globals [
 to setup
   clear-all
   set tick-limit 450
+  set last-recruitment-tick -1
   setup-galaxy
   setup-foundation
   setup-kingdoms
@@ -143,22 +146,30 @@ end
 
 to setup-agents
   create-missionaries initial-missionaries [
-    move-to terminus-planet
-    set home-planet terminus-planet
-    set target-planet nobody
-    set mission-skill 0.75 + random-float 0.50
-    set mode "idle"
-    set wait-ticks 0
+    initialize-missionary
   ]
   create-traders initial-traders [
-    move-to terminus-planet
-    set origin-planet terminus-planet
-    set target-planet nobody
-    set trade-skill 0.75 + random-float 0.50
-    set mode "idle"
-    set cargo 1
-    set wait-ticks 0
+    initialize-trader
   ]
+end
+
+to initialize-missionary
+  move-to terminus-planet
+  set home-planet terminus-planet
+  set target-planet nobody
+  set mission-skill 0.75 + random-float 0.50
+  set mode "idle"
+  set wait-ticks 0
+end
+
+to initialize-trader
+  move-to terminus-planet
+  set origin-planet terminus-planet
+  set target-planet nobody
+  set trade-skill 0.75 + random-float 0.50
+  set mode "idle"
+  set cargo 1
+  set wait-ticks 0
 end
 
 ;; SCHEDULER: go is the only procedure that advances simulation time.
@@ -212,8 +223,8 @@ to update-planet-economy
 end
 
 to initialize-policy-wealth
-  ;; Bounded baseline for Stage 5. Policy decisions will compare against it,
-  ;; then replace it; environmental updates must not overwrite prior wealth.
+  ;; Policy decisions compare against this bounded snapshot, then replace it;
+  ;; environmental updates must not overwrite prior wealth.
   foreach sort planets [ world -> ask world [ set previous-policy-wealth wealth ] ]
   foreach sort planets with [capital?] [ capital ->
     let group [kingdom-id] of capital
@@ -498,19 +509,117 @@ to process-trade-routes
 end
 
 to process-kingdom-policies
-  ;; TODO Stage 5: capital-led policies and independent-world decisions.
+  if ticks mod 10 != 0 or ticks < kingdom-policy-timer [ stop ]
+  foreach [1 2 3 4] [ group -> update-kingdom-policy group ]
+  foreach sort planets with [kingdom-id = 5] [ world ->
+    ask world [ update-independent-policy ]
+  ]
+  set kingdom-policy-timer ticks + 10
+end
+
+to update-kingdom-policy [group]
+  let worlds planets with [kingdom-id = group and not foundation?]
+  let capitals sort worlds with [capital?]
+  if empty? capitals [ stop ]
+  let capital first capitals
+  ;; All five means use the same population weights. Hostility acts through
+  ;; local admission and leverage, not an additional, unspecified threat term.
+  let averages kingdom-means worlds
+  let dependency item 1 averages
+  let current-wealth item 3 averages
+  let threat influence-threat averages
+  let threshold policy-threat-threshold
+  ask capital [
+    let next-policy policy
+    let crisis? dependency >= 0.60 and current-wealth <= previous-policy-wealth - 2
+    ifelse crisis? [
+      ;; An already-open government cannot soften further. A continuing crisis
+      ;; must not itself trigger a new restriction when the cooldown expires.
+      if policy != "open" [
+        set next-policy ifelse-value (policy = "embargo") ["restrict"] ["open"]
+        set policy-cooldown-until ticks + 20
+      ]
+    ] [
+      ifelse threat < threshold - 0.10 [
+        set next-policy "open"
+      ] [
+        if ticks >= policy-cooldown-until [
+          if threat > threshold and policy = "open" [ set next-policy "restrict" ]
+          if threat > threshold + 0.15 and dependency < 0.60 [ set next-policy "embargo" ]
+        ]
+      ]
+    ]
+    if next-policy != policy [ set last-policy-change-tick ticks ]
+    foreach sort worlds [ world -> ask world [ set-government-policy next-policy ] ]
+    set previous-policy-wealth current-wealth
+  ]
+end
+
+to update-independent-policy
+  ;; Local hysteresis: embargo releases below .80, restriction below .65.
+  ;; High dependency prevents entering embargo, but does not itself lift one.
+  let next-policy policy
+  if policy = "embargo" and hostility < 0.80 [ set next-policy "restrict" ]
+  if hostility < 0.65 [ set next-policy "open" ]
+  if hostility > 0.75 and next-policy = "open" [ set next-policy "restrict" ]
+  if hostility > 0.90 and tech-dependency < 0.60 [ set next-policy "embargo" ]
+  if next-policy != policy [ set last-policy-change-tick ticks ]
+  set-government-policy next-policy
+end
+
+to set-government-policy [next-policy]
+  set policy next-policy
+  set embargoed? (policy = "embargo")
 end
 
 to recruit-agents
-  ;; TODO Stage 5: replacements charged to the Foundation treasury.
+  if ticks mod 10 != 0 or last-recruitment-tick = ticks [ stop ]
+  set last-recruitment-tick ticks
+  ;; Fixed breed priority under scarce funds; detained travelers still count.
+  repeat 2 [
+    if count missionaries < initial-missionaries and foundation-treasury >= 10 [
+      create-missionaries 1 [ initialize-missionary ]
+      set total-recruited-missionaries total-recruited-missionaries + 1
+      set foundation-treasury foundation-treasury - 10
+      set cumulative-trade-profit cumulative-trade-profit - 10
+    ]
+  ]
+  repeat 2 [
+    if count traders < initial-traders and foundation-treasury >= 15 [
+      create-traders 1 [ initialize-trader ]
+      set total-recruited-traders total-recruited-traders + 1
+      set foundation-treasury foundation-treasury - 15
+      set cumulative-trade-profit cumulative-trade-profit - 15
+    ]
+  ]
 end
 
 to update-politics-effects
-  ;; TODO Stage 5: local repression and institutional persistence.
+  foreach sort planets with [not foundation?] [ world -> ask world [
+    if policy = "restrict" [
+      set hostility clamp01 (hostility + 0.002)
+      set religion clamp01 (religion - 0.004)
+    ]
+    if policy = "embargo" [
+      set hostility clamp01 (hostility + 0.004)
+      set religion clamp01 (religion - 0.009)
+    ]
+    if policy = "open" [
+      ;; Relax only elevated hostility; initial below-baseline jitter is retained.
+      if hostility > baseline-hostility [ set hostility max (list baseline-hostility (hostility - 0.001)) ]
+      set religion clamp01 (religion + ifelse-value temple? [0.002 * (1 - religion)] [-0.0005])
+    ]
+    dismantle-repressed-temple
+  ] ]
 end
 
 to update-control
-  ;; TODO Stage 5: consecutive-tick influence threshold.
+  foreach sort planets [ world -> ask world [
+    ifelse not foundation? and planet-leverage >= 0.58 [
+      set control-streak control-streak + 1
+    ] [ set control-streak 0 ]
+    set controlled? (control-streak >= 5)
+  ] ]
 end
 
 ;; DISPLAY: sorted single-agent asks avoid consuming the simulation RNG.
@@ -567,6 +676,51 @@ end
 
 to-report control-fraction
   report controlled-planets / 30
+end
+
+to-report planet-leverage
+  report clamp01 (0.30 * religion + 0.35 * tech-dependency +
+    0.25 * trade-trust + 0.15 * (1 - hostility))
+end
+
+to-report controlled-kingdoms
+  let result 0
+  foreach [1 2 3 4] [ group ->
+    let worlds sort planets with [kingdom-id = group]
+    let population-sum sum map [world -> [population] of world] worlds
+    let controlled-population sum map [world ->
+      [ifelse-value controlled? [population] [0]] of world] worlds
+    if population-sum > 0 and controlled-population / population-sum >= 0.60 and
+      any? planets with [kingdom-id = group and capital? and controlled?] [
+      set result result + 1
+    ]
+  ]
+  report result
+end
+
+to-report policy-threat-threshold
+  report 0.68 - 0.30 * royal-intolerance
+end
+
+to-report kingdom-means [worlds]
+  let ordered sort worlds
+  let weight sum map [world -> [population] of world] ordered
+  if weight <= 0 [ report [0 0 0 0 0] ]
+  let totals [0 0 0 0 0]
+  foreach ordered [ world ->
+    let values [(list religion tech-dependency trade-trust wealth hostility)] of world
+    let size-weight [population] of world
+    set totals (map [[total value] -> total + size-weight * value] totals values)
+  ]
+  report map [total -> total / weight] totals
+end
+
+to-report influence-threat [averages]
+  report 0.45 * item 0 averages + 0.40 * item 1 averages + 0.15 * item 2 averages
+end
+
+to-report recruitment-costs
+  report 10 * total-recruited-missionaries + 15 * total-recruited-traders
 end
 
 to-report mean-religion
@@ -660,12 +814,15 @@ to-report model-valid?
   if count trade-routes > count planets * (count planets - 1) / 2 [ report false ]
   if tick-limit != 450 or not in-range? ticks 0 tick-limit [ report false ]
   if not natural-number? ticks [ report false ]
+  if not in-range? last-recruitment-tick -1 ticks [ report false ]
+  if last-recruitment-tick != floor last-recruitment-tick [ report false ]
   if not in-range? foundation-treasury 0 1.0E+300 [ report false ]
   if not in-range? cumulative-trade-profit (-1.0E+300) 1.0E+300 [ report false ]
   if not in-range? trade-income-this-tick 0 1.0E+300 [ report false ]
   report empty? filter [value -> not natural-number? value] (list
     total-executed-missionaries total-executed-traders total-rejected-missions
-    total-successful-missions total-rejected-trades total-successful-trades kingdom-policy-timer)
+    total-successful-missions total-rejected-trades total-successful-trades kingdom-policy-timer
+    total-recruited-missionaries total-recruited-traders)
 end
 
 to-report planet-state-valid?
@@ -674,6 +831,7 @@ to-report planet-state-valid?
   if not in-range? population 0.5 1.5 [ report false ]
   if not in-range? wealth 0 100 [ report false ]
   if not in-range? previous-policy-wealth 0 100 [ report false ]
+  if not natural-number? last-policy-change-tick or not natural-number? policy-cooldown-until [ report false ]
   if not empty? filter [value -> not in-range? value 0 1] (list
     religion tech-dependency trade-trust tech-demand tech-health hostility taboo baseline-hostility
   ) [ report false ]
@@ -682,7 +840,7 @@ to-report planet-state-valid?
   ) [ report false ]
   if not member? policy ["open" "restrict" "embargo"] [ report false ]
   if embargoed? != (policy = "embargo") [ report false ]
-  if foundation? and (controlled? or capital? or embargoed?) [ report false ]
+  if foundation? and (controlled? or capital? or policy != "open") [ report false ]
   if controlled? != (control-streak >= 5) [ report false ]
   report empty? filter [value -> not natural-number? value]
     (list control-streak successful-trades failed-visits)
@@ -935,8 +1093,8 @@ Click setup to create a new galaxy. go-once advances one tick; go runs to 450.
 All planets remain stationary. Missionaries depart from Terminus, travel between
 worlds, and attempt to spread Scientism. Traders negotiate sales and establish
 trading relationships. Infrastructure wears, demand regenerates, and domestic
-substitution reduces dependency. Government decisions and recruitment are not
-active yet; policies can be forced manually for causal tests.
+substitution reduces dependency. Governments respond to influence and economic
+crises; the Foundation can pay to replace lost travelers.
 
 The two initial-count sliders set starting populations. missionary-effectiveness
 scales conversion; royal-intolerance lowers missionary admission and raises
@@ -967,7 +1125,7 @@ Under restrict/embargo, a temple is dismantled when religion < .35.
 
 A rejected missionary is executed with a separate state-dependent probability
 bounded [0,.55], or detained at the destination for 2–5 complete subsequent
-ticks. Survivors then choose another world. Deaths are not replaced yet.
+ticks. Survivors then choose another world. Paid recruitment can replace deaths.
 total-successful-missions, total-rejected-missions and
 total-executed-missionaries are cumulative since setup. Planet failed-visits
 counts rejections. Missionary activity produces no trade income or routes.
@@ -1001,7 +1159,7 @@ inventory or an upper bound on sale-size. Skill is sampled in [.75,1.25).
 Revenue of 12 * sale-size credits is booked once to treasury, current-tick
 income and cumulative profit. Planet wealth is a net development benefit after
 payment, not a conserved cash account. Initial travelers are free, with no
-upkeep or replacement spending yet, so current cumulative profit equals revenue.
+upkeep. Cumulative profit is revenue minus recruitment spending and may be negative.
 total-successful-trades and planet successful-trades count accepted visits,
 including zero-size admissions. At trade-attractiveness = 0, acceptance changes
 these counters only: no revenue, market-state change or route reinforcement.
@@ -1043,9 +1201,61 @@ mean-tech-health, mean-tech-demand and mean-wealth are unweighted external-world
 means; technology-crisis-planets counts external worlds meeting both crisis
 conditions. mean-religion and mean-dependency likewise exclude Terminus. These
 pure reporters support Command Center and BehaviorSpace observations.
-previous-policy-wealth holds the initial population-weighted kingdom wealth on
-capitals and initial local wealth elsewhere. It stays fixed until Stage 5 adds
-policy decisions that compare and refresh it; no growing history is retained.
+previous-policy-wealth holds the previous decision's population-weighted kingdom
+wealth on capitals (initialized during setup). Decisions compare before refreshing
+this snapshot; no growing history is retained. Other planets retain initial local
+wealth, with no independent-world crisis concession in this version.
+
+## GOVERNMENT, REPRESSION AND CONTROL
+
+The full tick order is environment, missionaries, traders, route wear, periodic
+policies/recruitment, local political effects, control, appearance, then tick.
+Policy and recruitment intervals begin at tick 0 and repeat every 10 ticks.
+All five planets in each kingdom share their capital's policy. Decisions use
+population-weighted means R (religion), D (dependency), T (trust), W (wealth),
+and H (hostility). Threat = .45 R + .40 D + .15 T; H acts through local admission
+and leverage, without a separate threat coefficient or kingdom-name rule.
+
+The restriction threshold is .68 - .30 * royal-intolerance. Threat strictly above
+it triggers restrict; threat above threshold + .15 triggers embargo only if
+D < .60. A restrictive policy persists until threat < threshold - .10, or an
+economic concession. Existing embargoes are not automatically lifted merely
+because D reaches .60. If D >= .60 and W has fallen at least 2 wealth units since
+the previous decision, embargo softens to restrict, or restrict to open. Each
+concession blocks escalation for 20 ticks; further concessions/release may occur
+during cooldown. An already-open government stays open while the measured crisis
+continues; this does not extend cooldown. No wealth is awarded. Capitals store the last transition tick
+and cooldown expiry. kingdom-policy-timer records the next scheduled decision.
+
+Independent worlds decide locally: hostility > .75 triggers restrict; hostility
+> .90 and dependency < .60 triggers embargo. Embargo releases below .80, and
+restriction below .65. Dependency gates entry, not release. These worlds share
+no government. Terminus remains open and exempt from political effects.
+
+Each tick restrict raises hostility .002 and lowers religion .004; embargo raises
+hostility .004 and lowers religion .009. Open policies reduce elevated hostility
+.001 toward baseline, without raising below-baseline initial jitter. An open
+temple sustains religion by .002 * (1 - religion); without a temple religion
+loses .0005. Values clamp to [0,1]. Repression dismantles temples below .35.
+There is no neighboring religious contagion or predetermined historical event.
+
+Planet leverage = clamp01(.30 * religion + .35 * dependency + .25 * trade-trust
++ .15 * (1 - hostility)). This is an influence index, not a probability. Leverage
+>= .58 for five consecutive ticks establishes effective control. One lower tick
+resets the streak and control immediately. Conversion alone cannot establish
+control; secular economic ties can. controlled-planets excludes Terminus and
+control-fraction divides by 30. controlled-kingdoms requires both a controlled
+capital and at least .60 of kingdom population living on controlled worlds.
+Control is reversible influence, not annexation; kingdom identities never change.
+
+Recruitment fills toward the two initial-count sliders every 10 ticks, at most
+two missionaries and two traders per interval. Living detained travelers count.
+Missionaries cost 10 credits each and are funded first; traders cost 15. Partial
+recruitment is allowed, but spending never overdraws treasury. New travelers
+start idle at Terminus and act on the following tick. Initial agents remain free.
+Cumulative total-recruited-missionaries, total-recruited-traders and recruitment-costs
+support exact population and financial audits. Treasury equals 200 plus cumulative
+trade profit under ordinary simulation; current-tick trade income is gross sales.
 
 ## INITIALIZATION
 
