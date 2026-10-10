@@ -24,7 +24,7 @@ globals [
   total-executed-missionaries total-executed-traders
   total-rejected-missions total-successful-missions
   total-rejected-trades total-successful-trades
-  kingdom-policy-timer tick-limit terminus-planet
+  kingdom-policy-timer active-tick-limit terminus-planet
   total-recruited-missionaries total-recruited-traders last-recruitment-tick
 ]
 
@@ -35,8 +35,12 @@ globals [
 ;; INITIALIZATION
 
 to setup
+  ;; Capture the widget/BehaviorSpace value before clear-all. Mid-run changes to
+  ;; tick-limit therefore apply only after the next setup.
+  let requested-tick-limit tick-limit
   clear-all
-  set tick-limit 450
+  set tick-limit requested-tick-limit
+  set active-tick-limit requested-tick-limit
   set last-recruitment-tick -1
   setup-galaxy
   setup-foundation
@@ -187,7 +191,7 @@ end
 ;; SCHEDULER: go is the only procedure that advances simulation time.
 
 to go
-  if ticks >= tick-limit [ stop ]
+  if ticks >= active-tick-limit [ stop ]
   set trade-income-this-tick 0
   process-environment
   process-missionaries
@@ -858,7 +862,9 @@ to-report model-valid?
     not in-range? route-strength 0 1 or not natural-number? route-age
   ] [ report false ]
   if count trade-routes > count planets * (count planets - 1) / 2 [ report false ]
-  if tick-limit != 450 or not in-range? ticks 0 tick-limit [ report false ]
+  if not in-range? tick-limit 100 3000 or tick-limit mod 50 != 0 [ report false ]
+  if not in-range? active-tick-limit 100 3000 or active-tick-limit mod 50 != 0 [ report false ]
+  if not in-range? ticks 0 active-tick-limit [ report false ]
   if not natural-number? ticks [ report false ]
   if not in-range? last-recruitment-tick -1 ticks [ report false ]
   if last-recruitment-tick != floor last-recruitment-tick [ report false ]
@@ -918,6 +924,33 @@ to assert-valid-model-state
   if not model-valid? [ error "Invalid galaxy, agent state, counters or clock." ]
 end
 @#$#@#$#@
+GRAPHICS-WINDOW
+310
+80
+766
+537
+-1
+-1
+7.0
+1
+10
+1
+1
+1
+0
+1
+1
+1
+-32
+31
+-32
+31
+1
+1
+1
+ticks
+30.0
+
 TEXTBOX
 10
 10
@@ -925,7 +958,7 @@ TEXTBOX
 42
 FOUNDATION  /  Religion, trade & control
 22
-0
+0.0
 0
 
 TEXTBOX
@@ -935,7 +968,7 @@ TEXTBOX
 65
 Indirect influence across 30 external worlds. No conquest; control can be lost.
 12
-0
+0.0
 0
 
 BUTTON
@@ -994,9 +1027,9 @@ TEXTBOX
 123
 290
 143
-MISSIONS
+SIMULATION DURATION
 13
-0
+0.0
 0
 
 SLIDER
@@ -1004,11 +1037,36 @@ SLIDER
 147
 290
 180
+tick-limit
+tick-limit
+100
+3000
+1000.0
+50
+1
+ticks
+HORIZONTAL
+
+TEXTBOX
+10
+190
+290
+210
+MISSIONS
+13
+0.0
+0
+
+SLIDER
+10
+214
+290
+247
 initial-missionaries
 initial-missionaries
 0
 40
-12
+38.0
 2
 1
 NIL
@@ -1016,14 +1074,14 @@ HORIZONTAL
 
 SLIDER
 10
-184
+251
 290
-217
+284
 missionary-effectiveness
 missionary-effectiveness
 0
 0.5
-0.25
+0.5
 0.05
 1
 NIL
@@ -1031,24 +1089,24 @@ HORIZONTAL
 
 TEXTBOX
 10
-226
+293
 290
-246
+313
 TRADE
 13
-0
+0.0
 0
 
 SLIDER
 10
-250
+317
 290
-283
+350
 initial-traders
 initial-traders
 0
 40
-12
+32.0
 2
 1
 NIL
@@ -1056,14 +1114,14 @@ HORIZONTAL
 
 SLIDER
 10
-287
+354
 290
-320
+387
 trade-attractiveness
 trade-attractiveness
 0
 1
-0.6
+0.85
 0.05
 1
 NIL
@@ -1071,14 +1129,14 @@ HORIZONTAL
 
 SLIDER
 10
-324
+391
 290
-357
+424
 religion-trade-weight
 religion-trade-weight
 0
 0.8
-0.55
+0.65
 0.05
 1
 NIL
@@ -1086,24 +1144,24 @@ HORIZONTAL
 
 TEXTBOX
 10
-365
+432
 290
-385
+452
 KINGDOM POLITICS
 13
-0
+0.0
 0
 
 SLIDER
 10
-389
+456
 290
-422
+489
 royal-intolerance
 royal-intolerance
 0
 1
-0.5
+0.15
 0.05
 1
 NIL
@@ -1111,34 +1169,34 @@ HORIZONTAL
 
 TEXTBOX
 10
-429
+496
 290
-460
+527
 Higher intolerance lowers tolerance for influence.
 11
-0
+0.0
 0
 
 TEXTBOX
 10
-466
+533
 290
-486
+553
 ECONOMY
 13
-0
+0.0
 0
 
 SLIDER
 10
-490
+557
 290
-523
+590
 tech-decay-rate
 tech-decay-rate
 0
 0.04
-0.015
+0.005
 0.005
 1
 NIL
@@ -1146,9 +1204,9 @@ HORIZONTAL
 
 SLIDER
 10
-527
+594
 290
-560
+627
 independence-effort
 independence-effort
 0
@@ -1161,29 +1219,29 @@ HORIZONTAL
 
 TEXTBOX
 10
-570
+637
 290
-590
+657
 VISUALIZATION
 13
-0
+0.0
 0
 
 CHOOSER
 10
-594
+661
 290
-639
+706
 view-mode
 view-mode
 "kingdom" "religion" "dependency" "control"
-0
+3
 
 BUTTON
 10
-646
+713
 145
-679
+746
 refresh view
 update-appearance
 NIL
@@ -1198,50 +1256,23 @@ NIL
 
 TEXTBOX
 154
-646
+713
 290
-680
+747
 Refresh when paused;\nno tick advances.
 11
-0
+0.0
 0
 
 TEXTBOX
 10
-692
+759
 290
-755
+822
 Cyan arrows: missionaries\nWhite squares: traders\nR = restrict; E = embargo\nBlue routes: stronger = thicker
 12
+0.0
 0
-0
-
-GRAPHICS-WINDOW
-310
-80
-766
-537
--1
--1
-7.0
-1
-10
-1
-1
-1
-0
-1
-1
-1
--32
-31
--32
-31
-1
-1
-1
-ticks
-30.0
 
 MONITOR
 310
@@ -1337,7 +1368,7 @@ MONITOR
 418
 699
 Restricted
-count planets with [not foundation? and policy = "restrict"]
+count planets with [not foundation? and policy = \"restrict\"]
 0
 1
 11
@@ -1382,7 +1413,7 @@ TEXTBOX
 731
 RELIGION: 0 red  ->  0.5 amber  ->  1 green
 11
-0
+0.0
 0
 
 TEXTBOX
@@ -1392,7 +1423,7 @@ TEXTBOX
 753
 DEPENDENCY: dark to light blue. CONTROL: green / gray.
 11
-0
+0.0
 0
 
 TEXTBOX
@@ -1402,7 +1433,7 @@ TEXTBOX
 780
 Gold star = Terminus; rings = capitals. R / E = policy.
 11
-0
+0.0
 0
 
 PLOT
@@ -1414,12 +1445,12 @@ Control over time
 ticks
 worlds / 30
 0.0
-450.0
+1000.0
 0.0
 30.0
 false
 false
-"" ""
+"set-plot-x-range 0 active-tick-limit" ""
 PENS
 "controlled-planets" 1.0 0 -10899396 true "" "plotxy ticks controlled-planets"
 
@@ -1432,12 +1463,12 @@ Religion and dependency
 ticks
 mean [0 - 1]
 0.0
-450.0
+1000.0
 0.0
 1.0
 false
 true
-"" ""
+"set-plot-x-range 0 active-tick-limit" ""
 PENS
 "mean-religion" 1.0 0 -10899396 true "" "plotxy ticks mean-religion"
 "mean-dependency" 1.0 0 -13791810 true "" "plotxy ticks mean-dependency"
@@ -1469,12 +1500,12 @@ Trade economy
 ticks
 credits / tick
 0.0
-450.0
+1000.0
 0.0
 10.0
 false
 false
-"" "set-plot-y-range 0 max (list 10 plot-y-max (10 * ceiling (trade-income-this-tick / 10)))"
+"set-plot-x-range 0 active-tick-limit" "set-plot-y-range 0 max (list 10 plot-y-max (10 * ceiling (trade-income-this-tick / 10)))"
 PENS
 "gross trade income" 1.0 0 -13791810 true "" "plotxy ticks trade-income-this-tick"
 
@@ -1485,8 +1516,9 @@ TEXTBOX
 768
 Histogram: 10 bins; last bin includes religion = 1.
 11
+0.0
 0
-0
+
 @#$#@#$#@
 ## WHAT IS IT?
 
@@ -1501,10 +1533,11 @@ hypothesis to investigate, not a guaranteed result or historical prediction.
 ## HOW TO USE IT
 
 1. Open this file in NetLogo 6.4.x. Choose slider settings, then click **setup**.
-   The saved defaults create 12 missionaries and 12 traders, with 31 planets.
+   Simulation Duration defaults to 1000 ticks and allows 100–3000 in steps of 50.
 2. Click **go-once** to advance exactly one tick. Click **go** to run continuously;
-   click it again to pause. Every run stops at tick 450. At that limit, neither
-   button advances the model; click setup to begin again.
+   click it again to pause. The run stops exactly at the duration captured by
+   setup. At that limit, neither button advances the model; click setup to begin
+   again. Changing Simulation Duration mid-run affects only the next setup.
 3. Watch the map, monitors and plots. Choose a view under **view-mode**.
    While paused, click **refresh view** to redraw without advancing time. During
    a run the view refreshes each tick. Colors and charts do not change outcomes.
@@ -1519,7 +1552,14 @@ changes affect subsequent actions; the two population sliders become recruitment
 targets. Lowering a target does not kill living agents. For comparisons, hold
 settings fixed within each run and set them before setup.
 
+The three tick-based plots set their horizontal range to the captured duration
+at setup and continue recording through the final tick. The religion histogram
+keeps its 0–1 horizontal scale because it is a distribution, not a time series.
+
 ### Parameters (widget names and meanings)
+
+- **tick-limit** (Simulation Duration): 100–3000 ticks in steps of 50; default
+  1000. Setup captures the selected value as the current run's fixed horizon.
 
 - **initial-missionaries** (missionaries: initial / target): 0–40 in steps of 2;
   default 12. Free initial missionaries and the desired living count thereafter.
@@ -1631,6 +1671,11 @@ eight-unit capital buffers. Placement retries are bounded. Kingdom membership is
 fixed. All policies start open; no routes or controlled worlds exist initially.
 Terminus starts with religion/trust/health 1, wealth 100, a temple, and no dependency.
 Treasury starts at 200; initial travelers are free and depart from Terminus.
+
+BehaviorSpace experiments set `tick-limit` explicitly before setup, so their
+duration is reproducible and independent of the Interface's saved slider value.
+The baseline and extended sweeps use 450 and 1000 ticks respectively with the
+same factor grid, repetitions, reporters and run-number-based seed scheme.
 
 External uniform ranges are religion [.02,.20), dependency [0,.08), trust [0,.10),
 health [.65,.90), demand [.40,.80), wealth [40,80), taboo [0,.35), population [.5,1.5).
@@ -1824,7 +1869,10 @@ are free, there is no upkeep, cargo renews between visits, and domestic substitu
 has no explicit investment cost. Government differences use initial hostility,
 not historical scripts. The fixed leverage weights and persistence threshold define
 effective influence, not legal sovereignty, and may be tested as assumptions in
-future work. The model does not implement psychohistory or predict real politics.
+future work. A longer horizon permits more visits, policy cycles, infrastructure
+wear and recovery, so 450- and 1000-tick outcomes need not match even though
+identically seeded runs have the same trajectory through tick 450. The model does
+not implement psychohistory or predict real politics.
 
 ## EXTENDING THE MODEL
 
@@ -1888,6 +1936,72 @@ NetLogo 6.4.0
 setup
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="Foundation Baseline Sweep (450 ticks)" repetitions="20" runMetricsEveryStep="false">
+    <setup>random-seed (100000 + behaviorspace-run-number) setup</setup>
+    <go>go</go>
+    <timeLimit steps="450"/>
+    <exitCondition>ticks &gt;= active-tick-limit</exitCondition>
+    <metric>control-fraction</metric>
+    <metric>cumulative-trade-profit</metric>
+    <metric>controlled-planets</metric>
+    <metric>controlled-kingdoms</metric>
+    <metric>mean-religion</metric>
+    <metric>mean-dependency</metric>
+    <metric>total-executed-missionaries</metric>
+    <metric>total-executed-traders</metric>
+    <metric>foundation-treasury</metric>
+    <metric>recruitment-costs</metric>
+    <metric>total-successful-trades</metric>
+    <metric>ticks</metric>
+    <metric>active-tick-limit</metric>
+    <metric>model-valid?</metric>
+    <metric>netlogo-version</metric>
+    <metric>100000 + behaviorspace-run-number</metric>
+    <enumeratedValueSet variable="missionary-effectiveness"><value value="0.1"/><value value="0.15"/><value value="0.2"/><value value="0.25"/><value value="0.3"/><value value="0.35"/><value value="0.4"/></enumeratedValueSet>
+    <enumeratedValueSet variable="royal-intolerance"><value value="0.2"/><value value="0.3"/><value value="0.4"/><value value="0.5"/><value value="0.6"/><value value="0.7"/><value value="0.8"/></enumeratedValueSet>
+    <enumeratedValueSet variable="tick-limit"><value value="450"/></enumeratedValueSet>
+    <enumeratedValueSet variable="initial-missionaries"><value value="12"/></enumeratedValueSet>
+    <enumeratedValueSet variable="initial-traders"><value value="12"/></enumeratedValueSet>
+    <enumeratedValueSet variable="trade-attractiveness"><value value="0.6"/></enumeratedValueSet>
+    <enumeratedValueSet variable="tech-decay-rate"><value value="0.015"/></enumeratedValueSet>
+    <enumeratedValueSet variable="religion-trade-weight"><value value="0.55"/></enumeratedValueSet>
+    <enumeratedValueSet variable="independence-effort"><value value="0.15"/></enumeratedValueSet>
+    <enumeratedValueSet variable="view-mode"><value value="&quot;kingdom&quot;"/></enumeratedValueSet>
+  </experiment>
+  <experiment name="Foundation Extended Sweep (1000 ticks)" repetitions="20" runMetricsEveryStep="false">
+    <setup>random-seed (100000 + behaviorspace-run-number) setup</setup>
+    <go>go</go>
+    <timeLimit steps="1000"/>
+    <exitCondition>ticks &gt;= active-tick-limit</exitCondition>
+    <metric>control-fraction</metric>
+    <metric>cumulative-trade-profit</metric>
+    <metric>controlled-planets</metric>
+    <metric>controlled-kingdoms</metric>
+    <metric>mean-religion</metric>
+    <metric>mean-dependency</metric>
+    <metric>total-executed-missionaries</metric>
+    <metric>total-executed-traders</metric>
+    <metric>foundation-treasury</metric>
+    <metric>recruitment-costs</metric>
+    <metric>total-successful-trades</metric>
+    <metric>ticks</metric>
+    <metric>active-tick-limit</metric>
+    <metric>model-valid?</metric>
+    <metric>netlogo-version</metric>
+    <metric>100000 + behaviorspace-run-number</metric>
+    <enumeratedValueSet variable="missionary-effectiveness"><value value="0.1"/><value value="0.15"/><value value="0.2"/><value value="0.25"/><value value="0.3"/><value value="0.35"/><value value="0.4"/></enumeratedValueSet>
+    <enumeratedValueSet variable="royal-intolerance"><value value="0.2"/><value value="0.3"/><value value="0.4"/><value value="0.5"/><value value="0.6"/><value value="0.7"/><value value="0.8"/></enumeratedValueSet>
+    <enumeratedValueSet variable="tick-limit"><value value="1000"/></enumeratedValueSet>
+    <enumeratedValueSet variable="initial-missionaries"><value value="12"/></enumeratedValueSet>
+    <enumeratedValueSet variable="initial-traders"><value value="12"/></enumeratedValueSet>
+    <enumeratedValueSet variable="trade-attractiveness"><value value="0.6"/></enumeratedValueSet>
+    <enumeratedValueSet variable="tech-decay-rate"><value value="0.015"/></enumeratedValueSet>
+    <enumeratedValueSet variable="religion-trade-weight"><value value="0.55"/></enumeratedValueSet>
+    <enumeratedValueSet variable="independence-effort"><value value="0.15"/></enumeratedValueSet>
+    <enumeratedValueSet variable="view-mode"><value value="&quot;kingdom&quot;"/></enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
