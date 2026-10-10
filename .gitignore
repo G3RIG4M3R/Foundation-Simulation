@@ -2,6 +2,7 @@
 /results/tmp/
 
 *.tmp
+*.tmp.nlogo
 *.log
 *~
 

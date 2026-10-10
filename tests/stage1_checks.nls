@@ -1,0 +1,266 @@
+;; Test-only procedures, appended to a temporary model by check_model.py.
+;; The production model has no includes or dependency on this file.
+
+to check-stage1
+  check-default-controls
+  ;; Legacy stage checks use the original calibrated horizon explicitly.
+  set tick-limit 450
+  set initial-missionaries 12
+  set initial-traders 12
+  random-seed 101
+  setup
+  check-world-and-population
+  check-placement
+  check-initial-state
+  check-wrapping
+  check-reinitialization
+  check-seeds-and-rendering
+  check-placement-errors
+  check-explicit-identities
+  check-validator
+  check-clock-and-corners
+  set stage1-checks-passed? true
+end
+
+to require [condition message]
+  if not condition [ error message ]
+end
+
+to check-default-controls
+  require ((list initial-missionaries missionary-effectiveness initial-traders
+    trade-attractiveness royal-intolerance tech-decay-rate religion-trade-weight
+    independence-effort) = [12 0.25 12 0.6 0.5 0.015 0.55 0.15]) "Wrong saved slider defaults"
+  require (tick-limit = 0) "Wrong saved Simulation Duration default"
+  require (view-mode = "kingdom") "Wrong saved chooser default"
+end
+
+to check-world-and-population
+  require ((list world-width world-height min-pxcor max-pxcor min-pycor max-pycor)
+    = [64 64 -32 31 -32 31]) "S1-B: world dimensions"
+  require (count planets = 31) "S1-C: planet count"
+  require (count planets with [foundation?] = 1) "S1-C: Foundation count"
+  require (count planets with [kingdom-id = 5] = 10) "S1-C: independent count"
+  require (count planets with [capital?] = 4) "S1-C: capital count"
+  foreach [1 2 3 4] [ group ->
+    require (count planets with [kingdom-id = group] = 5) "S1-C: kingdom size"
+    require (count planets with [kingdom-id = group and capital?] = 1) "S1-C: kingdom capital"
+  ]
+  require (not any? planets with [capital? and member? kingdom-id [0 5]]) "S1-C: extra capital"
+  require (count missionaries = initial-missionaries) "S1-C: missionary count"
+  require (count traders = initial-traders) "S1-C: trader count"
+  require (not any? trade-routes) "S1-C: initial routes"
+end
+
+to check-placement
+  let worlds sort planets
+  let positions map [world -> [(list xcor ycor)] of world] worlds
+  require (length remove-duplicates positions = 31) "S1-D: overlapping coordinates"
+  foreach worlds [ world ->
+    require ([xcor = pxcor and ycor = pycor] of world) "S1-D: off-grid planet"
+    foreach worlds [ other-world ->
+      if world != other-world [
+        require ([distance other-world] of world >= 3) "S1-D: separation below 3"
+      ]
+    ]
+    let group [kingdom-id] of world
+    if member? group [1 2 3 4] [
+      let capital one-of planets with [kingdom-id = group and capital?]
+      require ([distance capital] of world <= 6) "S1-D: planet outside kingdom cluster"
+    ]
+    if group = 5 [
+      foreach sort planets with [capital?] [ capital ->
+        require ([distance capital] of world > 8) "S1-D: independent inside cluster buffer"
+      ]
+    ]
+  ]
+  require ([xcor = 0 and ycor = 0] of terminus-planet) "S1-D: Terminus not centered"
+end
+
+to check-initial-state
+  require model-valid? "S1-H: validator rejected initialized state"
+  require (foundation-treasury = 200) "S1-E: starting treasury"
+  require (counters = [0 0 0 0 0 0 0 0 0]) "S1-E: initial counters"
+  require (controlled-planets = 0 and control-fraction = 0) "S1-H: initial control"
+  require ([ (list population religion tech-dependency trade-trust hostility taboo
+    tech-health wealth temple? foundation? capital? embargoed? policy controlled?) ] of
+    terminus-planet = [1 1 0 1 0 0 1 100 true true false false "open" false]) "S1-H: Terminus state"
+  foreach sort planets with [not foundation?] [ world -> ask world [
+    require (religion >= .02 and religion < .20) "S1-H: initial religion range"
+    require (tech-dependency >= 0 and tech-dependency < .08) "S1-H: initial dependency range"
+    require (trade-trust >= 0 and trade-trust < .10) "S1-H: initial trust range"
+    require (tech-health >= .65 and tech-health < .90) "S1-H: initial health range"
+    require (tech-demand >= .40 and tech-demand < .80) "S1-H: initial demand range"
+    require (wealth >= 40 and wealth < 80) "S1-H: initial wealth range"
+    require (taboo >= 0 and taboo < .35) "S1-H: initial taboo range"
+    require (population >= .5 and population < 1.5) "S1-H: initial population range"
+    require (policy = "open" and not temple? and not embargoed? and not controlled?) "S1-H: initial flags"
+    ifelse kingdom-id = 5 [
+      require (hostility >= .15 and hostility < .80) "S1-H: independent hostility"
+    ] [
+      let base item (kingdom-id - 1) [.60 .25 .50 .40]
+      require (baseline-hostility = base) "S1-H: kingdom baseline"
+      require (hostility >= base - .10 and hostility < base + .10) "S1-H: hostility jitter"
+    ]
+  ] ]
+  require (all? missionaries [home-planet = terminus-planet and target-planet = nobody
+    and mode = "idle" and wait-ticks = 0 and distance terminus-planet = 0
+    and mission-skill >= .75 and mission-skill < 1.25]) "S1-H: missionary initialization"
+  require (all? traders [origin-planet = terminus-planet and target-planet = nobody
+    and mode = "idle" and wait-ticks = 0 and cargo = 1 and distance terminus-planet = 0
+    and trade-skill >= .75 and trade-skill < 1.25]) "S1-H: trader initialization"
+end
+
+to check-wrapping
+  create-turtles 1 [
+    setxy 31 0
+    set heading 90
+    fd 1
+    require (xcor = -32 and ycor = 0) "S1-B: X wrapping"
+    setxy 0 31
+    set heading 0
+    fd 1
+    require (xcor = 0 and ycor = -32) "S1-B: Y wrapping"
+    die
+  ]
+  require ([distance patch 31 0] of patch -32 0 = 1) "S1-B: seam distance"
+end
+
+to check-reinitialization
+  ask terminus-planet [
+    create-trade-route-with one-of other planets [set route-strength .35]
+  ]
+  set foundation-treasury 17
+  set trade-income-this-tick 5
+  set cumulative-trade-profit -30
+  set total-executed-missionaries 1
+  set total-executed-traders 2
+  set total-rejected-missions 3
+  set total-successful-missions 7
+  set total-rejected-trades 4
+  set total-successful-trades 5
+  set kingdom-policy-timer 6
+  ask missionaries [ die ]
+  setup
+  setup
+  check-world-and-population
+  check-initial-state
+  require (ticks = 0) "S1-E: setup did not reset ticks"
+end
+
+to check-seeds-and-rendering
+  random-seed 42
+  setup
+  let snapshot state-snapshot
+  let expected-next random-float 1
+  random-seed 42
+  setup
+  require (snapshot = state-snapshot) "S1-F: same seed differs"
+  foreach ["religion" "dependency" "control" "kingdom"] [ view ->
+    set view-mode view
+    update-appearance
+    require (state-snapshot = snapshot) "Appearance changed model state"
+    require model-valid? "Appearance invalidated model"
+  ]
+  require (random-float 1 = expected-next) "Appearance or read-only reporter consumed RNG"
+  random-seed 43
+  setup
+  require (state-snapshot != snapshot) "S1-F: different seed did not vary initialization"
+  setup
+  require (state-snapshot != snapshot) "S1-F: setup appears to reseed"
+end
+
+to check-placement-errors
+  let message ""
+  carefully [ let unused choose-planet-site no-patches ] [ set message error-message ]
+  require (message = "Planet placement: no eligible patches.") "Empty placement did not fail clearly"
+  set message ""
+  carefully [ let unused choose-planet-site (patch-set patch 0 0) ] [ set message error-message ]
+  require (message = "Planet placement: no separated site found after 1000 attempts.") "Blocked placement did not fail clearly"
+end
+
+to check-explicit-identities
+  clear-all
+  create-world 27 5 false (patch 10 10)
+  create-world 0 0 false (patch 0 0)
+  create-world 6 2 true (patch 18 18)
+  require ([(list planet-id kingdom-id capital?)] of turtle 0 = [27 5 false]) "S1-D: IDs depend on who"
+  require ([(list planet-id kingdom-id foundation?)] of turtle 1 = [0 0 true]) "S1-D: Foundation identity depends on who"
+  require ([(list planet-id kingdom-id capital?)] of turtle 2 = [6 2 true]) "S1-D: capital identity depends on who"
+  setup
+end
+
+to check-validator
+  require (clamp01 -1 = 0 and clamp01 2 = 1 and clamp01 .4 = .4) "Clamp01 bounds"
+  require (clamp-range -5 10 20 = 10 and clamp-range 30 10 20 = 20) "Clamp-range bounds"
+  let world one-of planets with [not foundation?]
+  ask world [ set religion 1.1 ]
+  require (not model-valid?) "Validator missed invalid religion"
+  setup
+  ask one-of missionaries [ set target-planet terminus-planet ]
+  require (not model-valid?) "Validator missed forbidden target"
+  setup
+  set total-rejected-trades -1
+  require (not model-valid?) "Validator missed negative counter"
+  setup
+end
+
+to check-clock-and-corners
+  foreach [1 2 3 42 101] [ seed ->
+    foreach [[12 12] [0 12] [12 0] [0 0] [40 40]] [ counts ->
+      set initial-missionaries first counts
+      set initial-traders last counts
+      random-seed seed
+      setup
+      check-world-and-population
+      check-placement
+      check-initial-state
+      let snapshot planet-identities
+      set trade-income-this-tick 12
+      go
+      require (ticks = 1 and trade-income-this-tick = 0) "S1-G: go tick/reset"
+      go-once
+      require (ticks = 2) "S1-G: go-once double increment"
+      repeat 448 [
+        go
+        if member? ticks [10 100 450] [ assert-valid-model-state ]
+      ]
+      require (ticks = 450) "S1-G: horizon"
+      go
+      require (ticks = 450) "S1-G: overshot horizon"
+      go-once
+      require (ticks = 450) "S1-G: go-once overshot horizon"
+      require (snapshot = planet-identities) "Planet identities or positions changed"
+      require (abs (foundation-treasury - 200 - cumulative-trade-profit) < 1.0E-8) "Treasury/profit accounting"
+      if initial-traders = 0 [
+        require (foundation-treasury = 200 - recruitment-costs and cumulative-trade-profit = 0 - recruitment-costs
+          and total-successful-trades = 0 and not any? trade-routes) "Income without traders"
+      ]
+    ]
+  ]
+end
+
+to-report counters
+  report (list trade-income-this-tick cumulative-trade-profit total-executed-missionaries
+    total-executed-traders total-rejected-missions total-rejected-trades
+    total-successful-trades kingdom-policy-timer total-successful-missions)
+end
+
+to-report planet-identities
+  report map [world -> [(list planet-id kingdom-id capital? foundation? xcor ycor)] of world] sort planets
+end
+
+to-report state-snapshot
+  let worlds sort-by [[a b] -> [planet-id] of a < [planet-id] of b] sort planets
+  report (list
+    (map [world -> [(list planet-id kingdom-id capital? foundation? xcor ycor
+      population religion tech-dependency trade-trust tech-demand tech-health
+      wealth hostility taboo baseline-hostility temple? embargoed? policy
+      control-streak controlled? successful-trades failed-visits previous-policy-wealth
+      last-policy-change-tick policy-cooldown-until)] of world] worlds)
+    (map [visitor -> [(list xcor ycor heading mission-skill mode wait-ticks
+      ([planet-id] of home-planet) target-planet)] of visitor] sort missionaries)
+    (map [visitor -> [(list xcor ycor heading trade-skill mode cargo wait-ticks
+      ([planet-id] of origin-planet) target-planet)] of visitor] sort traders)
+    foundation-treasury counters count trade-routes
+    total-recruited-missionaries total-recruited-traders last-recruitment-tick)
+end

@@ -1,0 +1,382 @@
+;; Test fixtures are appended only to a temporary model by check_model.py.
+;; Outcome-conditioned seeds exercise branches; they are not experiment samples.
+
+to check-stage2
+  check-missionary-construction-and-targeting
+  check-mission-probabilities
+  check-missionary-motion
+  check-isolated-visits
+  check-conversion-and-temples
+  check-missionary-extinction
+  check-mission-traces
+  set stage2-checks-passed? true
+end
+
+to mission-fixture [population-size]
+  set initial-missionaries population-size
+  set initial-traders 0
+  set missionary-effectiveness .25
+  set royal-intolerance .5
+  set view-mode "kingdom"
+  random-seed 101
+  setup
+end
+
+to check-missionary-construction-and-targeting
+  mission-fixture 12
+  require (count missionaries = 12 and not any? traders) "S2-A: counts"
+  require (all? missionaries [missionary-state-valid? and target-planet = nobody
+    and mode = "idle" and wait-ticks = 0 and distance terminus-planet = 0]) "S2-A: construction"
+  go
+  require (all? missionaries [missionary-state-valid?]) "S2-A: live valid targets"
+  mission-fixture 1
+  let visitor first sort missionaries
+  let world first sort planets with [not foundation?]
+  ask visitor [
+    move-to world
+    repeat 100 [
+      select-missionary-destination
+      require (is-planet? target-planet and target-planet != world
+        and target-planet != terminus-planet) "Targeted current world or Terminus"
+    ]
+    let expected ((.05 + mission-acceptance-probability world) *
+      (.25 + 1 - [religion] of world))
+    require (abs (missionary-target-weight world - expected) < 1.0E-12) "Target weight formula"
+    setxy 0 0
+    require (missionary-target-weight world < expected) "Target score ignores distance"
+  ]
+  require (weighted-choice [] [] = nobody) "Empty weighted choice"
+  require (member? (weighted-choice [1 2] []) [1 2]) "Empty weights fallback"
+  require (member? (weighted-choice [1 2] [0 0]) [1 2]) "Zero weights fallback"
+  repeat 100 [ require (weighted-choice [1 2 3] [0 1 0] = 2) "Zero weight selected" ]
+  ;; Exercise both exact selection branches, without modifying production odds.
+  foreach [true false] [exploration? ->
+    let seed 0
+    let found? false
+    while [not found?] [
+      with-local-randomness [ random-seed seed set found? ((random-float 1 < .15) = exploration?) ]
+      if not found? [ set seed seed + 1 ]
+    ]
+    ask visitor [
+      let choices sort planets with [not foundation? and distance myself > 0]
+      let expected nobody
+      random-seed seed
+      let branch random-float 1
+      ifelse exploration? [ set expected one-of choices ] [
+        let weights map [destination -> missionary-target-weight destination] choices
+        let draw random-float sum weights
+        let cumulative 0
+        (foreach choices weights [[destination weight] ->
+          set cumulative cumulative + weight
+          if expected = nobody and draw < cumulative [ set expected destination ]
+        ])
+      ]
+      random-seed seed
+      select-missionary-destination
+      require (target-planet = expected) "Exploration/roulette selection differs from specified draw"
+    ]
+  ]
+  ask planets with [not foundation?] [ die ]
+  ask visitor [ set mode "idle" select-missionary-destination ]
+  require ([mode = "idle" and target-planet = nobody] of visitor) "No destination fallback"
+  mission-fixture 12
+  print "PASS S2-A: construction, targets, exploration and weighted selection"
+end
+
+to check-mission-probabilities
+  mission-fixture 1
+  let world first sort planets with [not foundation?]
+  ask world [ set hostility .3 set religion .5 set taboo .1 set temple? false ]
+  require (abs (mission-acceptance-probability world - .275) < 1.0E-12) "Open admission formula"
+  require (abs (execution-probability world - .096) < 1.0E-12) "Open execution formula"
+  ask world [ set policy "restrict" ]
+  require (abs (mission-acceptance-probability world - .095) < 1.0E-12) "Restricted admission formula"
+  require (abs (execution-probability world - .196) < 1.0E-12) "Restricted execution formula"
+  ask world [ set policy "embargo" set embargoed? true ]
+  require (mission-acceptance-probability world = .02) "Embargo admission floor"
+  require (abs (execution-probability world - .276) < 1.0E-12) "Embargo execution formula"
+  ask world [ set policy "open" set embargoed? false set hostility 0 set taboo 0 ]
+  set royal-intolerance 0
+  let permissive mission-acceptance-probability world
+  ask world [ set hostility 1 set policy "embargo" set embargoed? true ]
+  set royal-intolerance 1
+  require (mission-acceptance-probability world < permissive) "S2-E: repression must reduce admission"
+  foreach [0 .5 1] [intolerance ->
+    set royal-intolerance intolerance
+    foreach [0 .5 1] [h ->
+      foreach [0 .5 1] [r ->
+        foreach [0 1] [t ->
+          foreach [false true] [temple-state ->
+            foreach ["open" "restrict" "embargo"] [government ->
+              ask world [ set hostility h set religion r set taboo t
+                set temple? temple-state set policy government set embargoed? (policy = "embargo") ]
+              require (in-range? (mission-acceptance-probability world) .02 .95) "S2-E: admission bounds"
+              require (in-range? (execution-probability world) 0 .55) "S2-E: execution bounds"
+            ]
+          ]
+        ]
+      ]
+    ]
+  ]
+  let before state-snapshot
+  random-seed 7
+  let expected random-float 1
+  random-seed 7
+  repeat 10 [
+    let p mission-acceptance-probability world
+    let q execution-probability world
+    ask first sort missionaries [ let w missionary-target-weight world ]
+  ]
+  require (random-float 1 = expected and state-snapshot = before) "Probability/score reporters are not pure"
+end
+
+to check-missionary-motion
+  mission-fixture 12
+  repeat 10 [
+    let before map [visitor -> (list visitor [xcor] of visitor [ycor] of visitor)] sort missionaries
+    go
+    foreach before [row ->
+      let visitor first row
+      if is-missionary? visitor [
+        require ([distancexy (item 1 row) (item 2 row)] of visitor <= 1.5 + 1.0E-10) "S2-B: speed limit"
+      ]
+    ]
+    assert-valid-model-state
+  ]
+  require (any? missionaries with [distance terminus-planet > 0]) "S2-B: no departure"
+  foreach [[31 0 -31 0] [0 31 0 -31] [31 31 -31 -31]] [seam ->
+    mission-fixture 1
+    let world first sort planets with [not foundation?]
+    ask world [ setxy (item 2 seam) (item 3 seam) ]
+    let visitor first sort missionaries
+    ask visitor [
+      setxy (item 0 seam) (item 1 seam)
+      set target-planet world
+      set mode "travel"
+      let remaining distance world
+      move-missionary
+      require (abs (distance world - (remaining - 1.5)) < 1.0E-10) "S2-B: seam direction/distance"
+    ]
+    require (total-successful-missions + total-rejected-missions = 0) "Rolled outcome before arrival"
+    ask visitor [ move-missionary ]
+    require (total-successful-missions + total-rejected-missions = 1) "S2-C: missing arrival"
+    if is-missionary? visitor [ require ([distance world] of visitor = 0) "Overshot arrival" ]
+  ]
+  mission-fixture 1
+  ask first sort missionaries [
+    set mode "travel" set target-planet nobody step-missionary
+    require (mode = "idle") "Missing target guard"
+    set mode "travel" set target-planet terminus-planet step-missionary
+    require (mode = "idle" and target-planet = nobody) "Forbidden target guard"
+  ]
+  print "PASS S2-B: bounded motion and shortest paths across both seams"
+end
+
+;; Find seeds only for controlled branch fixtures, never for reported experiments.
+to-report visit-seed [world outcome]
+  let p mission-acceptance-probability world
+  let q execution-probability world
+  let seed 0
+  while [seed < 10000] [
+    let result ""
+    with-local-randomness [
+      random-seed seed
+      ifelse random-float 1 < p [ set result "accepted" ] [
+        set result ifelse-value (random-float 1 < q) ["executed"] ["detained"]
+      ]
+    ]
+    if result = outcome [ report seed ]
+    set seed seed + 1
+  ]
+  error "No controlled fixture seed found"
+end
+
+to arrange-visit [visitor world outcome]
+  ask visitor [ move-to world set target-planet world set mode "travel" set wait-ticks 0 ]
+  random-seed visit-seed world outcome
+  ask visitor [ resolve-missionary-visit ]
+end
+
+to check-isolated-visits
+  foreach ["accepted" "detained" "executed"] [outcome ->
+    mission-fixture 1
+    let visitor first sort missionaries
+    let world first sort planets with [not foundation?]
+    if outcome != "accepted" [
+      set royal-intolerance 1
+      ask world [ set hostility 1 set policy "embargo" set embargoed? true
+        set temple? true set religion .8 set tech-health .4 ]
+    ]
+    let r [religion] of world
+    let health [tech-health] of world
+    arrange-visit visitor world outcome
+    require (total-successful-missions + total-rejected-missions = 1) "S2-C: exactly one visit"
+    ifelse outcome = "accepted" [
+      let expected r + .25 * [mission-skill] of visitor * (1 - r) * (.4 + .6 * [tech-dependency] of world)
+      require (abs ([religion] of world - expected) < 1.0E-12) "S2-D: accepted conversion formula"
+      require (total-successful-missions = 1 and [failed-visits] of world = 0) "Accepted counters"
+      ask visitor [ repeat 5 [ resolve-missionary-visit ] ]
+      require (total-successful-missions = 1 and abs ([religion] of world - expected) < 1.0E-12) "S2-C: repeated arrival"
+      ask visitor [ step-missionary ]
+      require ([target-planet != world and distance world > 0] of visitor) "No next-world departure"
+    ] [
+      require (total-rejected-missions = 1 and [failed-visits] of world = 1) "S2-E: rejection counts"
+      require ([religion] of world = r and [tech-health] of world = health) "Rejected visitor gave benefits"
+      ifelse outcome = "executed" [
+        require (not any? missionaries and total-executed-missionaries = 1) "S2-E: execution"
+      ] [
+        require (count missionaries = 1 and total-executed-missionaries = 0) "S2-E: rejection is not certain death"
+        let delay [wait-ticks] of visitor
+        require (in-range? delay 2 5 and [mode] of visitor = "detained") "S2-E: detention length"
+        repeat delay [
+          ask visitor [ resolve-missionary-visit step-missionary ]
+          require ([distance world] of visitor = 0 and total-rejected-missions = 1) "Detention moved or rerolled"
+        ]
+        require ([mode = "idle" and wait-ticks = 0] of visitor) "Detention never released"
+        ask visitor [ step-missionary ]
+        require ([target-planet != world and distance world > 0] of visitor) "Detention departure"
+      ]
+    ]
+    require (foundation-treasury = 200 and cumulative-trade-profit = 0) "Mission generated income/cost"
+  ]
+  print "PASS S2-C/S2-E: single visits, rejection counters, detention and execution"
+end
+
+to check-conversion-and-temples
+  mission-fixture 1
+  let world first sort planets with [not foundation?]
+  let visitor first sort missionaries
+  let before [religion] of world
+  set missionary-effectiveness 0
+  arrange-visit visitor world "accepted"
+  require ([religion] of world = before and total-successful-missions = 1) "S2-D: zero effectiveness"
+  set missionary-effectiveness .25
+  ask world [
+    set tech-dependency .5
+    set religion .2
+    apply-accepted-mission 1
+    let low-gain religion - .2
+    require (abs (low-gain - .14) < 1.0E-12) "S2-D: dependence modifier"
+    set religion .9
+    apply-accepted-mission 1
+    require (religion - .9 < low-gain) "S2-D: saturation"
+    set religion 1
+    apply-accepted-mission 1.25
+    require (religion = 1) "S2-D: conversion above one"
+  ]
+  set missionary-effectiveness .5
+  ask world [
+    set religion .59 set temple? false set tech-dependency 0 set tech-health .7
+  ]
+  ask visitor [ set mission-skill 1 ]
+  arrange-visit visitor world "accepted"
+  require ([temple? and religion > .6 and abs (tech-health - .73) < 1.0E-12] of world) "S2-F: threshold/repair"
+  ask world [ set religion .59 set temple? false set policy "embargo" set embargoed? true set tech-health .7 ]
+  arrange-visit visitor world "accepted"
+  require ([religion > .6 and not temple? and tech-health = .7] of world) "S2-F: embargo construction/repair"
+  ask world [ set temple? true ]
+  arrange-visit visitor world "accepted"
+  require ([temple? and tech-health = .7] of world) "Inactive embargoed temple repaired health"
+  ask world [ set religion .35 dismantle-repressed-temple ]
+  require ([temple?] of world) "Temple removed at exactly .35"
+  ask world [ set religion .349 dismantle-repressed-temple ]
+  require (not [temple?] of world) "S2-F: embargo dismantling"
+  ask world [ set temple? true set policy "restrict" set embargoed? false dismantle-repressed-temple ]
+  require (not [temple?] of world) "S2-F: restrictive dismantling"
+  ask world [ set temple? true set policy "open" dismantle-repressed-temple ]
+  require ([temple?] of world) "S2-F: unrelated dismantling"
+  ask world [ set religion .6 set temple? false set tech-health .99 ]
+  set missionary-effectiveness 0
+  arrange-visit visitor world "accepted"
+  require ([temple? and tech-health = 1] of world) "Inclusive temple threshold/health clamp"
+  mission-fixture 0
+  let repressible first sort planets with [not foundation?]
+  ask repressible [ set temple? true set religion .34 set policy "restrict" ]
+  process-missionaries
+  require (not [temple?] of repressible) "Repressed temple not dismantled without visitors"
+  print "PASS S2-D/S2-F: zero/saturating conversion, temple thresholds and conditional repair"
+end
+
+to check-missionary-extinction
+  mission-fixture 0
+  repeat 450 [ go ]
+  require (ticks = 450 and model-valid? and total-successful-missions = 0
+    and total-rejected-missions = 0) "S2-G: empty population"
+  mission-fixture 12
+  let world first sort planets with [not foundation?]
+  foreach sort missionaries [visitor -> arrange-visit visitor world "executed"]
+  require (total-executed-missionaries = 12 and not any? missionaries) "S2-G: execution fixture"
+  set initial-missionaries 0 ;; Isolate extinction; paid recovery is tested in Stage 5.
+  repeat 450 [ go ]
+  require (ticks = 450 and model-valid? and not any? missionaries
+    and foundation-treasury = 200) "S2-G: extinction with zero recruitment target"
+  print "PASS S2-G: empty and fully executed populations reach tick 450"
+end
+
+to-report mission-trace
+  ;; Store numeric identities, never agent references that become nobody on reset.
+  report (list ticks total-successful-missions total-rejected-missions total-executed-missionaries
+    (map [world -> [(list planet-id religion tech-health temple? failed-visits)] of world] sort planets)
+    (map [visitor -> [(list who xcor ycor heading mission-skill mode wait-ticks
+      (ifelse-value (target-planet = nobody) [-1] [[planet-id] of target-planet]))] of visitor] sort missionaries))
+end
+
+to-report run-mission-trace [seed change-view?]
+  random-seed seed
+  setup
+  let result (list mission-trace)
+  repeat 450 [
+    if change-view? [ set view-mode item (ticks mod 4) ["kingdom" "religion" "dependency" "control"] update-appearance ]
+    let accepted total-successful-missions
+    let rejected total-rejected-missions
+    let executed total-executed-missionaries
+    let positions map [visitor -> (list visitor [xcor] of visitor [ycor] of visitor)] sort missionaries
+    go
+    let next-draw 0
+    with-local-randomness [ set next-draw random-float 1 ]
+    foreach positions [row ->
+      let visitor first row
+      if is-missionary? visitor [
+        require ([distancexy (item 1 row) (item 2 row)] of visitor <= 1.5 + 1.0E-10) "S2-B: full-run speed limit"
+      ]
+    ]
+    require (total-successful-missions >= accepted and total-rejected-missions >= rejected
+      and total-executed-missionaries >= executed) "Cumulative counter decreased"
+    require (count missionaries + total-executed-missionaries = initial-missionaries + total-recruited-missionaries) "Population conservation"
+    require (total-executed-missionaries <= total-rejected-missions) "Death without rejection"
+    require (sum map [world -> [failed-visits] of world] sort planets = total-rejected-missions) "Local/global rejection mismatch"
+    require (trade-income-this-tick = 0 and cumulative-trade-profit = 0 - recruitment-costs
+      and foundation-treasury = 200 - recruitment-costs and total-successful-trades = 0
+      and total-rejected-trades = 0 and total-executed-traders = 0 and not any? trade-routes) "Mission-only revenue/cost accounting"
+    assert-valid-model-state
+    set result lput mission-trace result
+    if seed = 101 and member? ticks [1 50 150 450] [
+      print (list "DIAGNOSTIC seed" seed "tick" ticks "accepted" total-successful-missions
+        "rejected" total-rejected-missions "executed" total-executed-missionaries
+        "missionaries [who x y heading skill mode wait target-id]" last mission-trace)
+    ]
+    with-local-randomness [
+      require (random-float 1 = next-draw) "Test observations consumed simulation randomness"
+    ]
+  ]
+  report result
+end
+
+to check-mission-traces
+  mission-fixture 12
+  let first-run run-mission-trace 123 false
+  require (first-run = run-mission-trace 123 false) "S2-H: seed replay differs"
+  require (first-run = run-mission-trace 123 true) "Display changed trajectory"
+  require (first-run != run-mission-trace 124 false) "S2-H: different seeds do not differ"
+  let diagnostic run-mission-trace 101 false
+  foreach [0 .5] [effectiveness ->
+    foreach [0 1] [intolerance ->
+      set initial-missionaries 40
+      set missionary-effectiveness effectiveness
+      set royal-intolerance intolerance
+      let corner-run run-mission-trace 3 false
+    ]
+  ]
+  require (ticks = 450 and model-valid?) "S2-H: final state"
+  print "PASS S2-H: full seed replay, different seed, display independence and parameter corners"
+end

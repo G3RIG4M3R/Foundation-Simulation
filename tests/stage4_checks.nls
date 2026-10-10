@@ -1,0 +1,289 @@
+;; Injected only into a temporary model. Forced states are causal fixtures,
+;; never production policies, experimental seed selection or calibration.
+
+to check-stage4
+  check-environment-wear
+  check-environment-maintenance
+  check-environment-demand
+  check-environment-substitution
+  check-environment-crisis-and-recovery
+  check-economic-reporters-and-memory
+  check-economic-coupling-and-order
+  check-environment-stress
+  trade-fixture 12 12 101
+  repeat 450 [ go assert-valid-model-state ]
+  set stage4-checks-passed? true
+end
+
+to economic-fixture
+  trade-fixture 0 0 101
+  set independence-effort 0
+  set tech-decay-rate .02
+  ask planets with [not foundation?] [
+    set religion .8 set tech-dependency .8 set tech-health .8
+    set tech-demand .4 set trade-trust .5 set wealth 80
+    set temple? false set policy "open" set embargoed? false
+  ]
+end
+
+to near [actual expected message]
+  require (abs (actual - expected) < 1.0E-10) message
+end
+
+to check-environment-wear
+  economic-fixture
+  let world first sort planets with [not foundation?]
+  let foundation-state market-state terminus-planet
+  random-seed 17 let next-draw random-float 1 random-seed 17
+  process-environment
+  near [tech-health] of world .7828 "S4-A: exact wear"
+  near [tech-demand] of world .408 "S4-C: demand must use incoming health"
+  near [trade-trust] of world .499 "Trust decay"
+  near [wealth] of world 80.015656 "Recovery uses updated health"
+  require (random-float 1 = next-draw) "Environment consumed RNG"
+  repeat 2000 [ process-environment assert-valid-model-state ]
+  require ([tech-health] of world = 0 and [wealth] of world = 0
+    and [tech-demand] of world = 1 and [trade-trust] of world = 0) "S4-A/G: lower/upper clamps"
+  require (market-state terminus-planet = foundation-state) "Environment changed Terminus"
+  print "PASS S4-A: exact wear, 2001 updates, local bounds, Terminus exclusion and RNG purity"
+end
+
+to check-environment-maintenance
+  economic-fixture
+  let worlds sublist sort planets with [not foundation?] 0 4
+  let active first worlds
+  let inactive item 1 worlds
+  let banned item 2 worlds
+  let low-religion item 3 worlds
+  ask (turtle-set active banned low-religion) [ set temple? true ]
+  ask banned [ set policy "embargo" set embargoed? true ]
+  ask low-religion [ set religion .599999 ]
+  ask active [ set religion .6 set policy "restrict" ]
+  process-environment
+  near [tech-health] of active .7908 "S4-B: inclusive maintenance threshold under restrict"
+  foreach (list inactive banned low-religion) [world ->
+    near [tech-health] of world .7828 "S4-B: maintenance eligibility"
+  ]
+  repeat 20 [ process-environment ]
+  require ([tech-health] of active > [tech-health] of inactive) "S4-B: maintained health"
+  ask active [ set tech-health 0 set tech-dependency 1 ]
+  process-environment
+  require ([tech-health] of active = 0) "S4-B: wear/offset must clamp jointly"
+  set tech-decay-rate 0
+  ask active [ set tech-health .999 ]
+  process-environment
+  require ([tech-health] of active = 1) "Maintenance upper clamp"
+  print "PASS S4-B: temple, religion threshold, embargo, restrictive policy and boundary maintenance"
+end
+
+to check-environment-demand
+  economic-fixture
+  let healthy first sort planets with [not foundation?]
+  let damaged last sort planets
+  ask healthy [ set tech-health 1 ]
+  ask damaged [ set tech-health 0 ]
+  process-environment
+  near [tech-demand] of healthy .406 "S4-C: healthy demand increment"
+  near [tech-demand] of damaged .416 "S4-C: damaged demand increment"
+  ask healthy [ apply-trade-sale .6 ]
+  near [tech-demand] of healthy .316 "S4-C: sale consumes demand"
+  process-environment
+  require ([tech-demand] of healthy > .316) "S4-C: demand replenishment"
+  repeat 200 [ process-environment ]
+  require (all? planets with [not foundation?] [tech-demand = 1]) "S4-C: demand saturation"
+  print "PASS S4-C: sale consumption, regeneration, health sensitivity and saturation"
+end
+
+to check-environment-substitution
+  economic-fixture
+  repeat 30 [ process-environment ]
+  require (all? planets with [not foundation?] [tech-dependency = .8 and religion = .8]) "S4-D: zero-effort substitution"
+  economic-fixture
+  set tech-decay-rate 0 set independence-effort 1
+  let rich first sort planets with [not foundation?]
+  let poor last sort planets
+  ask poor [ set wealth 0 ]
+  process-environment
+  near [tech-dependency] of rich .794 "S4-D: rich substitution rate"
+  near [tech-dependency] of poor .7988 "S4-D: poor substitution rate"
+  require ([wealth] of rich > 80) "S4-D: unspecified investment charge"
+  repeat 1000 [ process-environment assert-valid-model-state ]
+  require (all? planets with [not foundation?] [tech-dependency = 0 and religion = .8]) "S4-D: gradual independence/separate religion"
+  print "PASS S4-D: zero effort, wealth-scaled substitution, eventual independence and unchanged religion"
+end
+
+to check-environment-crisis-and-recovery
+  economic-fixture
+  set tech-decay-rate .01
+  let supported first sort planets with [not foundation?]
+  let banned last sort planets
+  ask (turtle-set supported banned) [ set temple? true ]
+  ask banned [ set policy "embargo" set embargoed? true ]
+  process-environment
+  require ([wealth] of banned > 80) "S4-E: immediate embargo penalty"
+  repeat 99 [ process-environment ]
+  require ([tech-health] of supported > [tech-health] of banned
+    and [wealth] of supported > [wealth] of banned
+    and [wealth] of banned < 80) "S4-E: delayed causal economic crisis"
+  let damaged market-state banned
+  ask banned [ set policy "open" set embargoed? false ]
+  require (market-state banned = damaged) "S4-F: reopening gave instant benefits"
+  let before-health [tech-health] of banned
+  ask banned [ apply-accepted-mission 1 ]
+  near [tech-health] of banned (before-health + .03) "S4-F: mission repair"
+  ask banned [ repeat 6 [ apply-trade-sale 1 ] ]
+  require ([tech-health] of banned > .5) "S4-F: replenishment cannot repair"
+  let before-wealth [wealth] of banned
+  process-environment
+  require ([wealth] of banned > before-wealth) "S4-F: high-condition recovery"
+  ;; Strict thresholds and post-substitution crisis evaluation.
+  set tech-decay-rate 0
+  ask banned [ set tech-health .5 set tech-dependency 1 set wealth 50 set temple? false ]
+  process-environment near [wealth] of banned 50.01 "Health threshold is strict"
+  ask banned [ set tech-health .4 set tech-dependency .45 set wealth 50 ]
+  process-environment near [wealth] of banned 50.008 "Dependency threshold is strict"
+  ask banned [ set tech-dependency .8 set wealth 50 ]
+  process-environment near [wealth] of banned 49.87 "Exact crisis penalty"
+  ask banned [ set tech-dependency .451 set wealth 50 ]
+  set independence-effort 1
+  process-environment near [wealth] of banned 50.008 "Crisis must use substituted dependency"
+  print "PASS S4-E/S4-F: delayed embargo losses, mission/sale repairs, recovery and strict crisis thresholds"
+end
+
+to check-economic-reporters-and-memory
+  trade-fixture 0 0 101
+  foreach sort planets with [capital?] [capital ->
+    let group [kingdom-id] of capital
+    let worlds sort planets with [kingdom-id = group]
+    let expected (sum map [world -> [wealth * population] of world] worlds) /
+      (sum map [world -> [population] of world] worlds)
+    near [previous-policy-wealth] of capital expected "Initial weighted kingdom wealth"
+  ]
+  require (all? planets with [not capital?] [previous-policy-wealth = wealth]) "Initial local wealth memory"
+  let memories map [world -> [previous-policy-wealth] of world] sort planets
+  repeat 11 [ process-environment ]
+  require (memories = map [world -> [previous-policy-wealth] of world] sort planets) "Environment overwrote policy memory"
+  ask planets with [not foundation?] [
+    set tech-health .3 set tech-demand .7 set wealth 20 set tech-dependency .8
+  ]
+  random-seed 42 let next-draw random-float 1 random-seed 42
+  let before state-snapshot
+  repeat 5 [
+    near mean-tech-health .3 "Health mean includes Terminus"
+    near mean-tech-demand .7 "Demand mean includes Terminus"
+    near mean-wealth 20 "Wealth mean includes Terminus"
+    require (technology-crisis-planets = 30) "Crisis count"
+    near population-weighted-wealth no-turtles 0 "Empty population mean"
+  ]
+  require (state-snapshot = before and random-float 1 = next-draw) "Economic reporters mutated state/RNG"
+  foreach ["wealth" "tech-health" "tech-dependency" "previous-policy-wealth"] [field ->
+    setup
+    ask first sort planets with [not foundation?] [ run (word "set " field " -1") ]
+    require (not model-valid?) (word "Invalid negative " field " accepted")
+    setup
+    ask first sort planets with [not foundation?] [ run (word "set " field " 101") ]
+    require (not model-valid?) (word "Invalid upper " field " accepted")
+  ]
+  print "PASS S4 reporting: pure external means, weighted initial memory, bounds and invalid-state rejection"
+end
+
+to check-economic-coupling-and-order
+  economic-fixture
+  let world first sort planets with [not foundation?]
+  ask world [ set religion 0 apply-trade-sale .6 ]
+  near [tech-dependency] of world .866 "S4-H: secular sale dependency"
+  require ([religion] of world = 0) "S4-H: sale converted religion"
+  ask world [ apply-accepted-mission 1 ]
+  near [tech-dependency] of world .866 "S4-H: mission increased dependency"
+  require ([religion] of world > 0) "S4-H: fixture did not convert"
+  trade-fixture 0 1 101
+  set world first sort planets with [not foundation?]
+  ask world [ set religion 0 set tech-dependency 0 set hostility 0 set taboo 0 ]
+  repeat 10 [ arrange-trade first sort traders terminus-planet world "accepted" ]
+  require ([tech-dependency] of world > .45 and [religion] of world = 0
+    and total-successful-trades = 10) "S4-H: secular world cannot become dependent"
+  ;; go must match the specified environmental-before-visitor sequence exactly.
+  trade-fixture 12 12 123
+  let observed []
+  repeat 450 [ go set observed lput trade-trace observed ]
+  trade-fixture 12 12 123
+  foreach observed [expected ->
+    set trade-income-this-tick 0
+    process-environment process-missionaries process-traders process-trade-routes
+    if ticks mod 10 = 0 [ process-kingdom-policies recruit-agents ]
+    update-politics-effects update-control update-appearance tick
+    require (trade-trace = expected) "S4: scheduler order/double environment update"
+  ]
+  print "PASS S4-H: separate conversion and economic ties; exact full-run scheduler replay"
+end
+
+to-report stress-economy [seed maximum?]
+  trade-fixture 40 40 seed
+  ifelse maximum? [
+    set missionary-effectiveness .5 set trade-attractiveness 1
+    set royal-intolerance 1 set tech-decay-rate .04
+    set religion-trade-weight .8 set independence-effort 1
+  ] [
+    set initial-missionaries 0 set initial-traders 0
+    set missionary-effectiveness 0 set trade-attractiveness 0
+    set royal-intolerance 0 set tech-decay-rate 0
+    set religion-trade-weight 0 set independence-effort 0
+  ]
+  random-seed seed setup
+  ;; Reach the real production horizon, then stress the same helpers further.
+  repeat 450 [ go assert-valid-model-state ]
+  let terminal trade-trace
+  go go-once require (trade-trace = terminal) "S4-G: production horizon changed"
+  let result []
+  repeat 2000 [
+    set trade-income-this-tick 0
+    process-environment process-missionaries process-traders process-trade-routes
+    assert-valid-model-state
+    set result lput trade-trace result
+  ]
+  report result
+end
+
+to check-environment-stress
+  foreach [false true] [maximum? ->
+    let trace stress-economy 123 maximum?
+    require (trace = stress-economy 123 maximum?) "S4-G: long-run seed replay"
+    require (trace != stress-economy 124 maximum?) "S4-G: long-run seed variability"
+  ]
+  ;; Mixed corners prevent all-max substitution masking persistent dependency.
+  foreach [0 .04] [decay -> foreach [0 1] [effort ->
+    economic-fixture set tech-decay-rate decay set independence-effort effort
+    ask planets with [not foundation?] [
+      set tech-dependency 1 set tech-health 1 set wealth 100
+      set religion 1 set temple? true
+      if planet-id mod 2 = 0 [ set policy "embargo" set embargoed? true ]
+    ]
+    repeat 2000 [ process-environment assert-valid-model-state ]
+  ] ]
+  print "PASS S4-G: 6 deterministic 2450-update runs, 4 mixed 2000-update corners; production stops at 450"
+end
+
+;; Actual BehaviorSpace time series: identical starting planetary states and
+;; seed, with a supported market vs unsupported embargo vs domestic alternatives.
+to setup-economic-scenario [scenario]
+  trade-fixture 0 (ifelse-value (scenario = "prosperity") [40] [0]) 101
+  set royal-intolerance 0 set tech-decay-rate .01 set independence-effort 0
+  ask planets with [not foundation?] [
+    set religion .9 set tech-dependency .85 set tech-health .8
+    set wealth 80 set tech-demand .7 set trade-trust .2
+    set hostility 0 set taboo 0 set temple? true
+    if scenario != "prosperity" [ set policy "embargo" set embargoed? true ]
+  ]
+  if scenario = "alternative-industry" [ set independence-effort 1 ]
+  initialize-policy-wealth
+end
+
+;; Hold policies and religious state fixed to isolate the original economic
+;; comparison after endogenous politics becomes active in the full model.
+to go-economic-scenario
+  if ticks >= tick-limit [ stop ]
+  set trade-income-this-tick 0
+  process-environment process-missionaries process-traders process-trade-routes
+  update-control update-appearance
+  tick
+end

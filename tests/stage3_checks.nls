@@ -1,0 +1,427 @@
+;; Injected into a temporary model only. Controlled seeds test event branches;
+;; diagnostic integration runs use the specified seeds without outcome selection.
+
+to check-stage3
+  check-trader-targeting
+  check-trade-probabilities
+  check-trader-motion
+  check-sale-accounting
+  check-trader-rejections
+  check-route-lifecycle
+  check-secular-trading
+  check-trade-integration
+  set stage3-checks-passed? true
+end
+
+to trade-fixture [mission-count trader-count seed]
+  set initial-missionaries mission-count
+  set initial-traders trader-count
+  set missionary-effectiveness .25
+  set trade-attractiveness .6
+  set royal-intolerance .5
+  set tech-decay-rate .015
+  set religion-trade-weight .55
+  set independence-effort .15
+  set view-mode "kingdom"
+  random-seed seed
+  setup
+end
+
+to-report trade-visit-seed [world outcome]
+  let p trade-acceptance-probability world
+  let q execution-probability world
+  let seed 0
+  while [seed < 10000] [
+    let result ""
+    with-local-randomness [
+      random-seed seed
+      ifelse random-float 1 < p [ set result "accepted" ] [
+        set result ifelse-value (random-float 1 < q) ["executed"] ["detained"]
+      ]
+    ]
+    if result = outcome [ report seed ]
+    set seed seed + 1
+  ]
+  error "No controlled trade fixture seed found"
+end
+
+to arrange-trade [visitor origin destination outcome]
+  ask visitor [
+    set origin-planet origin set target-planet destination move-to destination
+    set mode "travel" set wait-ticks 0 set cargo 1
+  ]
+  random-seed trade-visit-seed destination outcome
+  ask visitor [ resolve-trader-visit ]
+end
+
+to check-trader-targeting
+  trade-fixture 0 12 101
+  require (count traders = 12 and all? traders [trader-state-valid? and mode = "idle"
+    and cargo = 1 and origin-planet = terminus-planet and distance terminus-planet = 0]) "Trader construction"
+  let visitor first sort traders
+  let world first sort planets with [not foundation?]
+  let expected ([((.05 + trade-acceptance-probability world) * (.25 + [tech-demand] of world)
+    / (1 + distance world / 16))] of visitor)
+  require (abs ([trader-target-weight world] of visitor - expected) < 1.0E-12) "Trader score formula"
+  renew-trade-route terminus-planet world .6
+  require (abs ([trader-target-weight world] of visitor - expected * 1.75) < 1.0E-12) "Route targeting bonus"
+  ask direct-trade-route terminus-planet world [ set route-strength .10 ]
+  require (abs ([trader-target-weight world] of visitor - expected * 1.75) < 1.0E-12) "Extant remnant targeting score"
+  ask visitor [
+    move-to world set origin-planet world
+    repeat 100 [
+      select-trader-destination
+      require (is-planet? target-planet and target-planet != origin-planet
+        and target-planet != terminus-planet) "Current world/Terminus targeting"
+    ]
+  ]
+  foreach [true false] [exploration? ->
+    let seed 0
+    let found? false
+    while [not found?] [
+      with-local-randomness [ random-seed seed set found? ((random-float 1 < .15) = exploration?) ]
+      if not found? [ set seed seed + 1 ]
+    ]
+    ask visitor [
+      let choices sort planets with [not foundation? and distance myself > 0]
+      let selected nobody
+      random-seed seed
+      let branch random-float 1
+      ifelse exploration? [ set selected one-of choices ] [
+        let weights map [destination -> trader-target-weight destination] choices
+        let draw random-float sum weights
+        let cumulative 0
+        (foreach choices weights [[destination weight] ->
+          set cumulative cumulative + weight
+          if selected = nobody and draw < cumulative [ set selected destination ]
+        ])
+      ]
+      random-seed seed select-trader-destination
+      require (target-planet = selected) "Trader exploration/roulette draw"
+    ]
+  ]
+  ask planets with [not foundation?] [ die ]
+  ask visitor [ set mode "idle" select-trader-destination ]
+  require ([target-planet = nobody and mode = "idle"] of visitor) "Empty trader destinations"
+end
+
+to check-trade-probabilities
+  trade-fixture 0 1 101
+  let world first sort planets with [not foundation?]
+  ask world [ set hostility .3 set taboo .1 set tech-demand .7 set trade-trust .2 ]
+  let probabilities []
+  foreach [.1 .5 .9] [r ->
+    ask world [ set religion r ]
+    set probabilities lput trade-acceptance-probability world probabilities
+  ]
+  require (empty? filter [difference -> abs difference > 1.0E-12]
+    (map [[actual expected] -> actual - expected] probabilities [.21 .43 .65])) "S3-B: exact admission formula"
+  ask world [ set policy "restrict" ]
+  require (abs (trade-acceptance-probability world - .45) < 1.0E-12) "Restricted trade formula"
+  ask world [ set policy "embargo" set embargoed? true ]
+  require (abs (trade-acceptance-probability world - .20) < 1.0E-12) "Embargo trade formula"
+  foreach [0 .55 .8] [weight ->
+    set religion-trade-weight weight
+    foreach [0 1] [h -> foreach [0 1] [d -> foreach [0 1] [trust -> foreach [0 1] [t ->
+      foreach ["open" "restrict" "embargo"] [government ->
+        ask world [ set hostility h set tech-demand d set trade-trust trust
+          set taboo t set policy government set embargoed? (policy = "embargo") ]
+        let previous 0
+        foreach [0 .1 .5 .9 1] [r ->
+          ask world [ set religion r ]
+          let p trade-acceptance-probability world
+          require (in-range? p .02 .95 and p >= previous) "S3-B: bounds/monotonicity"
+          set previous p
+        ]
+      ]
+    ] ] ] ]
+  ]
+  let before state-snapshot
+  random-seed 7 let expected random-float 1 random-seed 7
+  repeat 10 [
+    let p trade-acceptance-probability world
+    let n active-trade-links
+    ask first sort traders [ let score trader-target-weight world let speed trader-travel-speed ]
+  ]
+  require (state-snapshot = before and random-float 1 = expected) "Trade reporters changed state/RNG"
+  print "PASS S3-B: admission formula, policy bounds, religion monotonicity and pure reporters"
+end
+
+to check-trader-motion
+  foreach [false true] [connected? ->
+    foreach [[31 0 -30 0] [0 31 0 -30] [31 31 -30 -30]] [seam ->
+      trade-fixture 0 1 101
+      let world first sort planets with [not foundation?]
+      let visitor first sort traders
+      ask world [ setxy (item 2 seam) (item 3 seam) ]
+      if connected? [ renew-trade-route terminus-planet world .6 ]
+      ask visitor [
+        setxy (item 0 seam) (item 1 seam) set target-planet world set mode "travel"
+        let speed ifelse-value connected? [2.25] [1.5]
+        require (trader-travel-speed = speed) "S3-G: route speed"
+        let remaining distance world
+        move-trader
+        require (abs (distance world - (remaining - speed)) < 1.0E-10) "S3-G: toroidal motion"
+      ]
+      require (total-successful-trades + total-rejected-trades = 0) "Trade before arrival"
+      repeat 3 [ if is-trader? visitor [ ask visitor [ if mode = "travel" [ move-trader ] ] ] ]
+      require (total-successful-trades + total-rejected-trades = 1) "One trade arrival"
+      if is-trader? visitor [ require ([distance world = 0 and origin-planet = world] of visitor) "Arrival/origin update" ]
+    ]
+  ]
+  trade-fixture 0 1 101
+  let world first sort planets with [not foundation?]
+  let visitor first sort traders
+  renew-trade-route terminus-planet world .6
+  ask visitor [ set target-planet world set mode "travel" ]
+  ask direct-trade-route terminus-planet world [ set route-strength .15 ]
+  require ([trader-travel-speed] of visitor = 2.25) "Inclusive .15 speed threshold"
+  process-trade-routes
+  require ([trader-travel-speed] of visitor = 1.5) "Weak route grants speed"
+  ask direct-trade-route terminus-planet world [ set route-strength .08 ]
+  process-trade-routes
+  ask visitor [ move-trader ]
+  require (not any? trade-routes and [trader-travel-speed] of visitor = 1.5) "Deleted route left stale reference"
+  ask visitor [
+    set target-planet nobody move-trader
+    require (mode = "idle") "Missing target guard"
+    set mode "travel" set target-planet terminus-planet move-trader
+    require (mode = "idle" and target-planet = nobody) "Terminus target guard"
+  ]
+  require (direct-trade-route nobody world = nobody and direct-trade-route world world = nobody) "Invalid endpoint guard"
+  print "PASS S3-G: direct route speeds, threshold, seam travel and removed-link safety"
+end
+
+to-report market-state [world]
+  report [(list religion tech-dependency tech-health trade-trust tech-demand wealth temple?)] of world
+end
+
+to check-sale-accounting
+  trade-fixture 0 2 101
+  let world first sort planets with [not foundation?]
+  let visitor first sort traders
+  ask world [ set religion .1 set tech-dependency .2 set tech-health .3
+    set trade-trust .4 set tech-demand .8 set wealth 50 ]
+  ask visitor [ set trade-skill 1 ]
+  arrange-trade visitor terminus-planet world "accepted"
+  let expected [.1 .266 .372 .454 .71 51.8]
+  require (empty? filter [difference -> abs difference > 1.0E-12]
+    (map [[actual wanted] -> actual - wanted] (but-last market-state world) expected)) "S3-D: sale attributes"
+  require (not [temple?] of world and [successful-trades] of world = 1
+    and total-successful-trades = 1 and total-rejected-trades = 0) "Sale counters/temple independence"
+  require (abs (trade-income-this-tick - 7.2) < 1.0E-12 and
+    abs (foundation-treasury - 207.2) < 1.0E-12 and abs (cumulative-trade-profit - 7.2) < 1.0E-12) "S3-H: exact credit accounting"
+  require (direct-trade-route terminus-planet world != nobody) "Lost departure origin before link creation"
+  let before state-snapshot
+  ask visitor [ repeat 5 [ resolve-trader-visit ] ]
+  require (state-snapshot = before and [cargo] of visitor = 0) "S3-D: repeated sale/capacity"
+  ask visitor [ step-trader ]
+  require ([cargo = 1 and target-planet != world and distance world > 0] of visitor) "Replenishment/departure"
+  let second-visitor last sort traders
+  ask second-visitor [ set trade-skill 1.25 ]
+  arrange-trade second-visitor terminus-planet world "accepted"
+  require (abs (trade-income-this-tick - 16.2) < 1.0E-12 and
+    abs (cumulative-trade-profit - 16.2) < 1.0E-12) "S3-H: sum of two revenues"
+  ask traders [ die ]
+  set initial-traders 0 ;; Isolate income reset from replacement spending.
+  go
+  require (trade-income-this-tick = 0 and abs (foundation-treasury - 216.2) < 1.0E-12) "Per-tick income reset/duplicate route payment"
+  ask world [ set religion .9 set tech-dependency .99 set tech-health .99
+    set trade-trust .99 set tech-demand .01 set wealth 99.9 apply-trade-sale 1.25 ]
+  require (market-state world = [.9 1 1 1 0 100 false]) "Sale clamps or religious interference"
+  trade-fixture 0 1 101
+  set trade-attractiveness 0
+  set world first sort planets with [not foundation?]
+  set visitor first sort traders
+  set before market-state world
+  arrange-trade visitor terminus-planet world "accepted"
+  require (market-state world = before and foundation-treasury = 200
+    and trade-income-this-tick = 0 and cumulative-trade-profit = 0 and not any? trade-routes) "Zero-size trade effects"
+  require (total-successful-trades = 1 and [successful-trades] of world = 1) "Zero-size admission counters"
+  renew-trade-route terminus-planet world .6
+  arrange-trade visitor terminus-planet world "accepted"
+  require ([route-strength] of direct-trade-route terminus-planet world = .35) "Zero-size route reinforcement"
+  print "PASS S3-D/S3-H: single and multiple sale accounting, capacity, bounds and zero-size admissions"
+end
+
+to check-trader-rejections
+  foreach ["detained" "executed"] [outcome ->
+    trade-fixture 0 1 101
+    let visitor first sort traders
+    let world first sort planets with [not foundation?]
+    ask world [ set hostility 1 set policy "embargo" set embargoed? true ]
+    set royal-intolerance 1
+    renew-trade-route terminus-planet world .6
+    let before market-state world
+    arrange-trade visitor terminus-planet world outcome
+    require (total-rejected-trades = 1 and [failed-visits] of world = 1 and total-successful-trades = 0) "S3-E: rejection counts"
+    require (market-state world = before and foundation-treasury = 200 and cumulative-trade-profit = 0) "Rejected sale benefits"
+    require (count trade-routes = 1 and all? trade-routes [is-planet? end1 and is-planet? end2]) "S3-E: trader as endpoint"
+    ifelse outcome = "executed" [
+      require (not any? traders and total-executed-traders = 1) "S3-E: execution"
+      set initial-traders 0 ;; Isolate extinction; paid recovery is tested in Stage 5.
+      repeat 450 [ go ]
+      require (ticks = 450 and not any? traders and model-valid?) "All traders dead robustness"
+    ] [
+      require (total-executed-traders = 0 and [mode] of visitor = "detained") "S3-E: detention not execution"
+      let delay [wait-ticks] of visitor
+      require (in-range? delay 2 5) "Trader detention duration"
+      repeat delay [
+        ask visitor [ resolve-trader-visit step-trader ]
+        require ([distance world = 0 and origin-planet = world] of visitor
+          and total-rejected-trades = 1) "Detention moved/rerolled"
+      ]
+      require ([mode = "idle" and wait-ticks = 0] of visitor) "Detention release"
+      ask visitor [ step-trader ]
+      require ([target-planet != world and distance world > 0] of visitor) "Rejected trader departure"
+    ]
+  ]
+  print "PASS S3-E: separate detention/execution outcomes, counters and extinction"
+end
+
+to check-route-lifecycle
+  trade-fixture 0 1 101
+  let visitor first sort traders
+  let origin first sort planets with [not foundation?]
+  let destination last sort planets
+  require (active-trade-links = 0) "S3-F: initial links"
+  arrange-trade visitor origin destination "accepted"
+  let route direct-trade-route origin destination
+  require (active-trade-links = 1 and [route-strength = .35 and route-age = 0] of route) "S3-F: new edge"
+  ask route [ set route-age 9 ]
+  ask visitor [ set trade-skill 1 ]
+  arrange-trade visitor destination origin "accepted"
+  require (active-trade-links = 1 and direct-trade-route destination origin = route
+    and abs ([route-strength] of route - .47) < 1.0E-12 and [route-age] of route = 9) "S3-F: undirected reinforcement/age"
+  renew-trade-route origin origin 1
+  renew-trade-route nobody destination 1
+  require (active-trade-links = 1) "Invalid route endpoint"
+  repeat 10 [ renew-trade-route origin destination 1.25 ]
+  require ([route-strength] of route = 1) "Route upper clamp"
+  ask route [ set route-strength .35 set route-age 0 ]
+  repeat 134 [ process-trade-routes ]
+  require (is-link? route and abs ([route-strength] of route - .082) < 1.0E-10
+    and [route-age] of route = 134) "Route decay/age rate"
+  repeat 66 [ process-trade-routes ]
+  require (not any? trade-routes) "S3-F: idle edge never removed"
+  renew-trade-route origin destination .6
+  ask direct-trade-route origin destination [ set route-strength .082 ]
+  process-trade-routes
+  require (count trade-routes = 1) "Removed route at inclusive .08 boundary"
+  process-trade-routes
+  require (not any? trade-routes) "Retained route below .08"
+  ;; A sale inside go creates a route, then the scheduler ages it exactly once.
+  trade-fixture 0 1 101
+  set visitor first sort traders set destination first sort planets with [not foundation?]
+  ask visitor [ set target-planet destination set mode "travel" move-to destination ]
+  random-seed trade-visit-seed destination "accepted"
+  go
+  require (total-successful-trades = 1 and count trade-routes = 1) "Sale-in-go fixture did not trade"
+  set route direct-trade-route terminus-planet destination
+  require ([route-age] of route = 1 and abs ([route-strength] of route - .348) < 1.0E-12) "Double/missing decay in scheduler"
+  let before route-snapshot
+  random-seed 42 let expected random-float 1 random-seed 42
+  repeat 5 [ update-appearance ]
+  require (route-snapshot = before and random-float 1 = expected) "Route display changed state/RNG"
+  ask route [ set route-strength .1 ] update-appearance
+  let weak-style [(list color thickness)] of route
+  ask route [ set route-strength .9 ] update-appearance
+  require ([color] of route > first weak-style and [thickness] of route > last weak-style) "Route style ignores strength"
+  print "PASS S3-F: undirected edges, reinforcement, single scheduler decay, aging/removal and visual purity"
+end
+
+to check-secular-trading
+  let sales 0
+  foreach range 100 [seed ->
+    trade-fixture 0 1 101
+    let visitor first sort traders
+    let world first sort planets with [not foundation?]
+    ask world [ set religion 0 set tech-demand 1 set hostility 0 set taboo 0 set trade-trust 0 ]
+    require (abs (trade-acceptance-probability world - .35) < 1.0E-12) "S3-C: secular admission"
+    ask visitor [ move-to world set target-planet world set mode "travel" ]
+    random-seed seed
+    ask visitor [ resolve-trader-visit ]
+    set sales sales + total-successful-trades
+    require ([religion] of world = 0 and not [temple?] of world) "Trade converted secular world"
+  ]
+  require (sales > 0 and sales < 100) "S3-C: independent trials did not show stochastic secular trade"
+  print (word "PASS S3-C: " sales " accepted secular trades in 100 independent seeded trials")
+end
+
+to-report route-snapshot
+  report map [route -> [(list [planet-id] of end1 [planet-id] of end2 route-strength route-age)] of route] sort trade-routes
+end
+
+to-report trade-trace
+  report (list ticks (first state-snapshot) mission-trace
+    (map [visitor -> [(list who xcor ycor heading trade-skill mode cargo wait-ticks
+      [planet-id] of origin-planet (ifelse-value (target-planet = nobody) [-1] [[planet-id] of target-planet]))] of visitor] sort traders)
+    route-snapshot foundation-treasury counters)
+end
+
+to-report run-trade-trace [seed change-view?]
+  random-seed seed setup
+  let result (list trade-trace)
+  let identities planet-identities
+  let income-sum 0
+  repeat 450 [
+    if change-view? [ set view-mode item (ticks mod 4) ["kingdom" "religion" "dependency" "control"] update-appearance ]
+    let positions map [visitor -> (list visitor [xcor] of visitor [ycor] of visitor)] sort traders
+    let previous (list total-successful-trades total-rejected-trades total-executed-traders)
+    let profit cumulative-trade-profit
+    let costs recruitment-costs
+    go
+    let next-draw 0 with-local-randomness [ set next-draw random-float 1 ]
+    foreach positions [row ->
+      let visitor first row
+      if is-trader? visitor [ require ([distancexy (item 1 row) (item 2 row)] of visitor <= 2.25 + 1.0E-10) "Trader full-run speed limit" ]
+    ]
+    require (planet-identities = identities and model-valid?) "S3-I: model invariants"
+    require (count traders + total-executed-traders = initial-traders + total-recruited-traders
+      and count missionaries + total-executed-missionaries = initial-missionaries + total-recruited-missionaries) "Population conservation"
+    require (empty? filter [difference -> difference < 0]
+      (map [[current old] -> current - old]
+        (list total-successful-trades total-rejected-trades total-executed-traders) previous)) "Non-monotonic counters"
+    require (total-executed-traders <= total-rejected-trades) "Execution without rejection"
+    require (sum map [world -> [successful-trades] of world] sort planets = total-successful-trades) "Local/global sales mismatch"
+    require (sum map [world -> [failed-visits] of world] sort planets = total-rejected-trades + total-rejected-missions) "Local/global rejection mismatch"
+    set income-sum income-sum + trade-income-this-tick
+    require (abs (cumulative-trade-profit - profit - trade-income-this-tick + recruitment-costs - costs) < 1.0E-8
+      and abs (cumulative-trade-profit - income-sum + recruitment-costs) < 1.0E-8
+      and abs (foundation-treasury - 200 - income-sum + recruitment-costs) < 1.0E-8) "S3-H: integrated income ledger"
+    set result lput trade-trace result
+    with-local-randomness [ require (random-float 1 = next-draw) "Trade observations consumed RNG" ]
+  ]
+  report result
+end
+
+to check-trade-integration
+  trade-fixture 12 0 101
+  let zero-trader-run run-trade-trace 101 false
+  require (total-successful-trades = 0 and not any? trade-routes and cumulative-trade-profit = 0 - recruitment-costs
+    and total-successful-missions + total-rejected-missions > 0) "S3-A: zero traders"
+  trade-fixture 0 12 101
+  ;; Isolate trade-driven expansion from Stage 4's independent substitution.
+  set independence-effort 0
+  let zero-mission-run run-trade-trace 101 false
+  require (total-successful-trades > 0 and mean-dependency > .04) "S3-A: secular economic expansion"
+  trade-fixture 12 12 123
+  let first-run run-trade-trace 123 false
+  require (first-run = run-trade-trace 123 false) "Integrated seed replay"
+  require (first-run = run-trade-trace 123 true) "Rendering changed trade trajectory"
+  require (first-run != run-trade-trace 124 false) "Integrated seed variability"
+  foreach [101 102 103] [seed ->
+    let trace run-trade-trace seed false
+    require (total-successful-trades > 0 and total-rejected-trades > 0) "S3-I: default visits/sales"
+    print (list "S3-I seed" seed "tick" ticks "sales" total-successful-trades
+      "rejected" total-rejected-trades "executed" total-executed-traders
+      "routes" active-trade-links "treasury" foundation-treasury "profit" cumulative-trade-profit)
+  ]
+  foreach [[0 0] [0 1] [1 0] [1 1]] [corner ->
+    trade-fixture 40 40 3
+    set trade-attractiveness first corner set royal-intolerance last corner
+    let trace run-trade-trace 3 false
+    if trade-attractiveness = 0 [ require (foundation-treasury = 200 - recruitment-costs and not any? trade-routes) "Zero-attraction full-run effects" ]
+  ]
+  print "PASS S3-A/S3-I: 450-tick integration, empty breeds, income ledger, seed replay and parameter corners"
+end

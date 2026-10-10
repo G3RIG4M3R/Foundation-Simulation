@@ -191,7 +191,9 @@ end
 ;; SCHEDULER: go is the only procedure that advances simulation time.
 
 to go
-  if ticks >= active-tick-limit [ stop ]
+  ;; Zero is the interactive "unlimited" setting. BehaviorSpace experiments
+  ;; always set a positive horizon and also carry a matching time limit.
+  if active-tick-limit > 0 and ticks >= active-tick-limit [ stop ]
   set trade-income-this-tick 0
   process-environment
   process-missionaries
@@ -862,9 +864,10 @@ to-report model-valid?
     not in-range? route-strength 0 1 or not natural-number? route-age
   ] [ report false ]
   if count trade-routes > count planets * (count planets - 1) / 2 [ report false ]
-  if not in-range? tick-limit 100 3000 or tick-limit mod 50 != 0 [ report false ]
-  if not in-range? active-tick-limit 100 3000 or active-tick-limit mod 50 != 0 [ report false ]
-  if not in-range? ticks 0 active-tick-limit [ report false ]
+  if not valid-tick-limit? tick-limit [ report false ]
+  if not valid-tick-limit? active-tick-limit [ report false ]
+  if ticks < 0 [ report false ]
+  if active-tick-limit > 0 and ticks > active-tick-limit [ report false ]
   if not natural-number? ticks [ report false ]
   if not in-range? last-recruitment-tick -1 ticks [ report false ]
   if last-recruitment-tick != floor last-recruitment-tick [ report false ]
@@ -875,6 +878,17 @@ to-report model-valid?
     total-executed-missionaries total-executed-traders total-rejected-missions
     total-successful-missions total-rejected-trades total-successful-trades kingdom-policy-timer
     total-recruited-missionaries total-recruited-traders)
+end
+
+to-report valid-tick-limit? [value]
+  report value = 0 or (in-range? value 100 3000 and value mod 50 = 0)
+end
+
+to-report plot-time-maximum
+  if active-tick-limit > 0 [ report active-tick-limit ]
+  ;; Unlimited interactive runs begin with a useful window and expand in
+  ;; 100-tick blocks without imposing a simulation stopping condition.
+  report max (list 100 (100 * ceiling ((ticks + 1) / 100)))
 end
 
 to-report planet-state-valid?
@@ -1039,9 +1053,9 @@ SLIDER
 180
 tick-limit
 tick-limit
-100
+0
 3000
-1000.0
+0.0
 50
 1
 ticks
@@ -1066,7 +1080,7 @@ initial-missionaries
 initial-missionaries
 0
 40
-38.0
+12.0
 2
 1
 NIL
@@ -1081,7 +1095,7 @@ missionary-effectiveness
 missionary-effectiveness
 0
 0.5
-0.5
+0.25
 0.05
 1
 NIL
@@ -1106,7 +1120,7 @@ initial-traders
 initial-traders
 0
 40
-32.0
+12.0
 2
 1
 NIL
@@ -1121,7 +1135,7 @@ trade-attractiveness
 trade-attractiveness
 0
 1
-0.85
+0.6
 0.05
 1
 NIL
@@ -1136,7 +1150,7 @@ religion-trade-weight
 religion-trade-weight
 0
 0.8
-0.65
+0.55
 0.05
 1
 NIL
@@ -1161,7 +1175,7 @@ royal-intolerance
 royal-intolerance
 0
 1
-0.15
+0.5
 0.05
 1
 NIL
@@ -1196,7 +1210,7 @@ tech-decay-rate
 tech-decay-rate
 0
 0.04
-0.005
+0.015
 0.005
 1
 NIL
@@ -1235,7 +1249,7 @@ CHOOSER
 view-mode
 view-mode
 "kingdom" "religion" "dependency" "control"
-3
+0
 
 BUTTON
 10
@@ -1450,7 +1464,7 @@ worlds / 30
 30.0
 false
 false
-"set-plot-x-range 0 active-tick-limit" ""
+"set-plot-x-range 0 plot-time-maximum" "set-plot-x-range 0 plot-time-maximum"
 PENS
 "controlled-planets" 1.0 0 -10899396 true "" "plotxy ticks controlled-planets"
 
@@ -1468,7 +1482,7 @@ mean [0 - 1]
 1.0
 false
 true
-"set-plot-x-range 0 active-tick-limit" ""
+"set-plot-x-range 0 plot-time-maximum" "set-plot-x-range 0 plot-time-maximum"
 PENS
 "mean-religion" 1.0 0 -10899396 true "" "plotxy ticks mean-religion"
 "mean-dependency" 1.0 0 -13791810 true "" "plotxy ticks mean-dependency"
@@ -1505,7 +1519,7 @@ credits / tick
 10.0
 false
 false
-"set-plot-x-range 0 active-tick-limit" "set-plot-y-range 0 max (list 10 plot-y-max (10 * ceiling (trade-income-this-tick / 10)))"
+"set-plot-x-range 0 plot-time-maximum" "set-plot-x-range 0 plot-time-maximum set-plot-y-range 0 max (list 10 plot-y-max (10 * ceiling (trade-income-this-tick / 10)))"
 PENS
 "gross trade income" 1.0 0 -13791810 true "" "plotxy ticks trade-income-this-tick"
 
@@ -1533,11 +1547,12 @@ hypothesis to investigate, not a guaranteed result or historical prediction.
 ## HOW TO USE IT
 
 1. Open this file in NetLogo 6.4.x. Choose slider settings, then click **setup**.
-   Simulation Duration defaults to 1000 ticks and allows 100–3000 in steps of 50.
+   Simulation Duration defaults to 0 (unlimited); positive choices are
+   100–3000 ticks in steps of 50.
 2. Click **go-once** to advance exactly one tick. Click **go** to run continuously;
-   click it again to pause. The run stops exactly at the duration captured by
-   setup. At that limit, neither button advances the model; click setup to begin
-   again. Changing Simulation Duration mid-run affects only the next setup.
+   click it again to pause. A positive duration stops exactly at the value
+   captured by setup; 0 continues until you pause the run. Changing Simulation
+   Duration mid-run affects only the next setup.
 3. Watch the map, monitors and plots. Choose a view under **view-mode**.
    While paused, click **refresh view** to redraw without advancing time. During
    a run the view refreshes each tick. Colors and charts do not change outcomes.
@@ -1552,14 +1567,14 @@ changes affect subsequent actions; the two population sliders become recruitment
 targets. Lowering a target does not kill living agents. For comparisons, hold
 settings fixed within each run and set them before setup.
 
-The three tick-based plots set their horizontal range to the captured duration
-at setup and continue recording through the final tick. The religion histogram
-keeps its 0–1 horizontal scale because it is a distribution, not a time series.
+For a finite run, the three tick-based plots use its captured duration. For an
+unlimited run they expand in 100-tick blocks. The religion histogram keeps its
+0–1 horizontal scale because it is a distribution, not a time series.
 
 ### Parameters (widget names and meanings)
 
-- **tick-limit** (Simulation Duration): 100–3000 ticks in steps of 50; default
-  1000. Setup captures the selected value as the current run's fixed horizon.
+- **tick-limit** (Simulation Duration): 0 means unlimited; finite choices are
+  100–3000 ticks in steps of 50. Setup captures the selected value for the run.
 
 - **initial-missionaries** (missionaries: initial / target): 0–40 in steps of 2;
   default 12. Free initial missionaries and the desired living count thereafter.
@@ -1672,10 +1687,11 @@ fixed. All policies start open; no routes or controlled worlds exist initially.
 Terminus starts with religion/trust/health 1, wealth 100, a temple, and no dependency.
 Treasury starts at 200; initial travelers are free and depart from Terminus.
 
-BehaviorSpace experiments set `tick-limit` explicitly before setup, so their
-duration is reproducible and independent of the Interface's saved slider value.
-The baseline and extended sweeps use 450 and 1000 ticks respectively with the
-same factor grid, repetitions, reporters and run-number-based seed scheme.
+The duration-sweep BehaviorSpace definitions set `tick-limit` explicitly before
+setup, so they are independent of the unlimited Interface default. Every other
+automated definition carries a finite BehaviorSpace time limit and records its
+terminal `ticks`. The baseline and extended sweeps use 450 and 1000 ticks with
+the same factor grid, repetitions, reporters and run-number-based seed scheme.
 
 External uniform ranges are religion [.02,.20), dependency [0,.08), trust [0,.10),
 health [.65,.90), demand [.40,.80), wealth [40,80), taboo [0,.35), population [.5,1.5).

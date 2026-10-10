@@ -1,0 +1,381 @@
+;; Controlled mechanism fixtures; appended only to temporary test models.
+to check-stage5
+  check-government-decisions
+  check-economic-concessions
+  check-political-effects
+  check-influence-control
+  check-paid-recruitment
+  check-political-runs
+  trade-fixture 12 12 101
+  repeat 450 [ go-political-check ]
+  set stage5-checks-passed? true
+end
+
+to politics-fixture
+  trade-fixture 0 0 101
+  ask planets with [not foundation?] [
+    set population 1 set religion 0 set tech-dependency 0 set trade-trust 0
+    set wealth 80 set hostility .3 set baseline-hostility .3
+  ]
+  initialize-policy-wealth
+end
+
+to set-kingdom-threat [group threat]
+  ;; Equal R/D/T make their weighted sum exactly the chosen threat.
+  ask planets with [kingdom-id = group] [
+    set religion threat set tech-dependency threat set trade-trust threat
+  ]
+end
+
+to require-policy [group expected]
+  require (count planets with [kingdom-id = group and policy = expected] = 5)
+    (word "S5 shared policy: kingdom " group " expected " expected)
+  require (all? planets with [kingdom-id = group] [embargoed? = (policy = "embargo")]) "Embargo flag mismatch"
+end
+
+to check-government-decisions
+  politics-fixture
+  let capital first sort planets with [kingdom-id = 1 and capital?]
+  ask capital [ set population 1.5 set religion 1 set tech-dependency .5
+    set trade-trust .8 set wealth 40 set hostility .9 ]
+  let values kingdom-means (planets with [kingdom-id = 1])
+  foreach (range 5) [i ->
+    near (item i values) (item i (list (1.5 / 5.5) (.75 / 5.5) (1.2 / 5.5)
+      (380 / 5.5) (2.55 / 5.5))) "S5-A: weighted means"
+  ]
+  require (kingdom-means no-turtles = [0 0 0 0 0]) "Empty means guard"
+  politics-fixture
+  near policy-threat-threshold .53 "S5-B: threshold formula"
+  set-kingdom-threat 1 .53
+  update-kingdom-policy 1 require-policy 1 "open"
+  set-kingdom-threat 1 .54
+  update-kingdom-policy 1 require-policy 1 "restrict"
+  foreach [2 3 4] [group -> require-policy group "open"]
+  require (all? planets with [kingdom-id = 5 or foundation?] [policy = "open"]) "S5-A: cross-government update"
+  repeat 5 [
+    set-kingdom-threat 1 .51 update-kingdom-policy 1 require-policy 1 "restrict"
+    set-kingdom-threat 1 .55 update-kingdom-policy 1 require-policy 1 "restrict"
+  ]
+  set-kingdom-threat 1 .43 update-kingdom-policy 1 require-policy 1 "restrict"
+  set-kingdom-threat 1 .429 update-kingdom-policy 1 require-policy 1 "open"
+  ask planets with [kingdom-id = 1] [set religion 1 set tech-dependency .5 set trade-trust 1]
+  update-kingdom-policy 1 require-policy 1 "embargo"
+  set-kingdom-threat 2 .8 update-kingdom-policy 2 require-policy 2 "restrict"
+  ;; Intolerance alone changes the response; no kingdom-name special case.
+  set royal-intolerance 0 set-kingdom-threat 3 .5
+  update-kingdom-policy 3 require-policy 3 "open"
+  set royal-intolerance 1 update-kingdom-policy 3 require-policy 3 "restrict"
+  let before influence-threat kingdom-means (planets with [kingdom-id = 4])
+  ask planets with [kingdom-id = 4] [ apply-accepted-mission 1 apply-trade-sale 1 ]
+  require (influence-threat kingdom-means (planets with [kingdom-id = 4]) > before) "S5-B: mission/sale threat response"
+  ;; Independent thresholds and their .10 release gaps.
+  let independent first sort planets with [kingdom-id = 5]
+  ask independent [
+    set hostility .75 update-independent-policy require (policy = "open") "Independent strict threshold"
+    set hostility .76 update-independent-policy require (policy = "restrict") "Independent restriction"
+    set hostility .70 update-independent-policy require (policy = "restrict") "Independent hysteresis"
+    set hostility .64 update-independent-policy require (policy = "open") "Independent release"
+    set hostility .91 set tech-dependency .6 update-independent-policy
+    require (policy = "restrict") "Independent dependency embargo guard"
+    set tech-dependency .59 update-independent-policy require (policy = "embargo") "Independent embargo"
+    set hostility .80 update-independent-policy require (policy = "embargo") "Independent embargo hysteresis"
+    set hostility .79 update-independent-policy require (policy = "restrict") "Independent embargo release"
+  ]
+  politics-fixture
+  set-kingdom-threat 1 .54
+  go require-policy 1 "restrict"
+  require (kingdom-policy-timer = 10) "Policy at tick zero"
+  set-kingdom-threat 1 0
+  repeat 9 [ go require-policy 1 "restrict" ]
+  go require-policy 1 "open"
+  require (kingdom-policy-timer = 20) "Policy ten-tick cadence"
+  print "PASS S5-A/B/C: weighted shared governments, influence/intolerance response, hysteresis, independents and cadence"
+end
+
+to check-economic-concessions
+  foreach [.599999 .6] [dependency ->
+    politics-fixture
+    set independence-effort 0 ;; Hold dependency at the boundary during cooldown.
+    ask planets with [kingdom-id = 1] [
+      set religion 1 set tech-dependency dependency set trade-trust 1
+      set-government-policy "embargo" set wealth 78
+    ]
+    update-kingdom-policy 1
+    require-policy 1 (ifelse-value (dependency < .6) ["embargo"] ["restrict"])
+  ]
+  let capital first sort planets with [kingdom-id = 1 and capital?]
+  require ([previous-policy-wealth] of capital = 78 and [policy-cooldown-until] of capital = 20) "S5-D: crisis memory/cooldown"
+  ask planets with [kingdom-id = 1] [ set wealth 76 ]
+  update-kingdom-policy 1 require-policy 1 "open"
+  require ([previous-policy-wealth] of capital = 76) "S5-D: wealth snapshot not refreshed"
+  repeat 20 [
+    update-kingdom-policy 1 require-policy 1 "open"
+    go
+  ]
+  require (ticks = 20) "Cooldown fixture clock"
+  update-kingdom-policy 1 require-policy 1 "restrict"
+  require ([last-policy-change-tick] of capital = 20) "S5-D: transition timestamp"
+  politics-fixture
+  ask planets with [kingdom-id = 1] [
+    set religion 1 set tech-dependency .8 set trade-trust 1 set wealth 78
+  ]
+  update-kingdom-policy 1 require-policy 1 "open"
+  ;; Once the observed decline ends, normal threat decisions resume.
+  update-kingdom-policy 1 require-policy 1 "restrict"
+  politics-fixture
+  ask planets with [kingdom-id = 1] [ set-kingdom-fixture-state ]
+  update-kingdom-policy 1 require-policy 1 "restrict"
+  ;; Endogenous wealth decline must trigger concession through the real cycle.
+  politics-fixture
+  set tech-decay-rate .04 set independence-effort 0
+  ask planets with [kingdom-id = 1] [
+    set religion .9 set tech-dependency .8 set trade-trust .8
+    set tech-health .6 set temple? true set-government-policy "embargo"
+  ]
+  let restricted? false let opened? false
+  repeat 31 [
+    go
+    let current [policy] of first sort planets with [kingdom-id = 1 and capital?]
+    if current = "restrict" [set restricted? true]
+    if current = "open" [set opened? true]
+  ]
+  require (restricted? and opened? and population-weighted-wealth (planets with [kingdom-id = 1]) < 78)
+    "S5-D: environmental crisis failed to soften government"
+  print "PASS S5-D: inclusive two-unit decline/.60 dependency, one-step concessions, rolling memory and exact cooldown"
+end
+
+to set-kingdom-fixture-state
+  set religion .9 set tech-dependency .8 set trade-trust .9
+  set-government-policy "restrict" set wealth 78.000001
+end
+
+to check-political-effects
+  politics-fixture
+  let worlds sublist sort planets with [kingdom-id = 5] 0 4
+  (foreach worlds ["restrict" "embargo" "open" "open"] [[world government] ->
+    ask world [ set religion .8 set hostility .5 set temple? true set-government-policy government ]
+  ])
+  ask last worlds [ set temple? false ]
+  let foundation-state market-state terminus-planet
+  update-politics-effects
+  (foreach worlds [.796 .791 .8004 .7995] [.502 .504 .499 .499] [[world r h] ->
+    near [religion] of world r "S5-F: exact local religious update"
+    near [hostility] of world h "S5-F: exact hostility drift"
+  ])
+  require (market-state terminus-planet = foundation-state) "Politics changed Terminus"
+  ask first worlds [ set religion .35 set temple? true ]
+  update-politics-effects require (not [temple?] of first worlds) "S5-F: causal temple dismantling"
+  repeat 1000 [ update-politics-effects ]
+  require ([religion = 0 and hostility = 1] of first worlds) "Repression bounds"
+  near [hostility] of last worlds .3 "Open hostility baseline floor"
+  let world last worlds
+  ask world [set religion .8 set hostility .2 set taboo 0 set tech-demand 1 set trade-trust .5]
+  set royal-intolerance 0
+  let p mission-acceptance-probability world let q trade-acceptance-probability world
+  ask world [set-government-policy "restrict"]
+  require (mission-acceptance-probability world < p and trade-acceptance-probability world < q) "S5-E: restriction admission effect"
+  set p mission-acceptance-probability world set q trade-acceptance-probability world
+  ask world [set-government-policy "embargo"]
+  require (mission-acceptance-probability world < p and trade-acceptance-probability world < q) "S5-E: embargo admission effect"
+  ;; Matched high-dependency worlds: sanctions have delayed, causal costs.
+  economic-fixture set tech-decay-rate .01
+  let supported first sort planets with [kingdom-id = 5]
+  let banned last sort planets
+  ask (turtle-set supported banned) [set religion .9 set temple? true]
+  ask banned [set-government-policy "embargo"]
+  process-environment update-politics-effects
+  require ([wealth] of banned > 80) "Instant arbitrary sanction penalty"
+  repeat 99 [ process-environment update-politics-effects ]
+  require ([wealth] of banned < 80 and [wealth] of banned < [wealth] of supported
+    and [tech-health] of banned < [tech-health] of supported) "S5-E: expensive dependent embargo"
+  print "PASS S5-E/F: admission penalties, exact repression/persistence, temple loss, bounded hostility and delayed embargo costs"
+end
+
+to check-influence-control
+  politics-fixture
+  let world first sort planets with [not foundation?]
+  ask world [set religion 1 set hostility 0]
+  near [planet-leverage] of world .45 "S5-G: conversion is not control"
+  ask world [set religion 0 set tech-dependency 1 set trade-trust 1 set hostility 0]
+  near [planet-leverage] of world .75 "S5-G: secular leverage"
+  repeat 4 [update-control require (controlled-planets = 0) "S5-G: early control"]
+  update-control require (controlled-planets = 1 and [control-streak] of world = 5) "S5-G: fifth tick"
+  near control-fraction (1 / 30) "Control denominator"
+  ask world [set tech-dependency 0 set trade-trust 0]
+  update-control require (controlled-planets = 0 and [control-streak] of world = 0) "S5-G: reversible control"
+  ask world [set religion 1 set tech-dependency .8 set hostility 1]
+  near [planet-leverage] of world .58 "S5-G: exact leverage boundary"
+  repeat 5 [update-control]
+  require ([controlled?] of world) "S5-G: inclusive .58"
+  ask world [set religion 1 set tech-dependency 1 set trade-trust 1 set hostility 0]
+  near [planet-leverage] of world 1 "Leverage clamps 1.05"
+  require (not [controlled?] of terminus-planet and [control-streak] of terminus-planet = 0) "Terminus control exclusion"
+  politics-fixture
+  let members sort planets with [kingdom-id = 1]
+  foreach sublist members 0 3 [p -> ask p [set controlled? true set control-streak 5 set population .5]]
+  foreach sublist members 3 5 [p -> ask p [set population 1.5]]
+  require (controlled-kingdoms = 0) "S5-H: unweighted headcount"
+  ask planets with [kingdom-id = 1] [set population 1]
+  require (controlled-kingdoms = 1) "S5-H: exact .60 with capital"
+  ask first members [set controlled? false set control-streak 0]
+  ask last members [set controlled? true set control-streak 5]
+  require (controlled-kingdoms = 0) "S5-H: missing capital"
+  ask planets with [member? kingdom-id [1 2 3 4]] [set controlled? true set control-streak 5]
+  require (controlled-kingdoms = 4) "S5-H: all four kingdoms"
+  let before state-snapshot
+  random-seed 7 let draw random-float 1 random-seed 7
+  repeat 5 [
+    let n controlled-kingdoms let c control-fraction
+    let means kingdom-means planets with [kingdom-id = 1]
+    let threat influence-threat means let threshold policy-threat-threshold
+    foreach sort planets [p -> let leverage [planet-leverage] of p]
+  ]
+  require (before = state-snapshot and random-float 1 = draw) "Politics/control reporters consumed RNG/state"
+  print "PASS S5-G/H: exact leverage, five consecutive ticks/reset, secular control, population share/capital and reporter purity"
+end
+
+to check-paid-recruitment
+  politics-fixture
+  set initial-missionaries 12 set initial-traders 12
+  recruit-agents
+  require (count missionaries = 2 and count traders = 2 and foundation-treasury = 150
+    and cumulative-trade-profit = -50 and recruitment-costs = 50) "S5-I: caps and exact costs"
+  require (all? missionaries [missionary-state-valid? and distance terminus-planet = 0]
+    and all? traders [trader-state-valid? and distance terminus-planet = 0]) "Recruit initialization"
+  recruit-agents require (foundation-treasury = 150) "S5-I: repeat charge in interval"
+  repeat 10 [ go ]
+  require (total-recruited-missionaries = 2 and total-recruited-traders = 2) "S5-I: recruitment before tick ten"
+  go require (total-recruited-missionaries = 4 and total-recruited-traders = 4) "S5-I: missing interval recruitment"
+  foreach [9 10 15 25] [budget ->
+    politics-fixture set initial-missionaries 1 set initial-traders 1
+    set foundation-treasury budget
+    recruit-agents
+    let expected-m ifelse-value (budget >= 10) [1] [0]
+    let expected-t ifelse-value (budget >= 25) [1] [0]
+    require (count missionaries = expected-m and count traders = expected-t
+      and foundation-treasury = budget - 10 * expected-m - 15 * expected-t) "S5-I: partial affordability/priority"
+  ]
+  politics-fixture set initial-traders 12 set foundation-treasury 15
+  recruit-agents require (count traders = 1 and foundation-treasury = 0) "Single affordable trader"
+  trade-fixture 1 1 101
+  ask missionaries [set mode "detained" set wait-ticks 5]
+  ask traders [set mode "detained" set wait-ticks 5]
+  recruit-agents require (recruitment-costs = 0) "Detained agents replaced"
+  ;; Complete execution with no funds, followed by later budget recovery.
+  let world first sort planets with [not foundation?]
+  arrange-visit first sort missionaries world "executed"
+  arrange-trade first sort traders terminus-planet world "executed"
+  set foundation-treasury 0
+  repeat 20 [go]
+  require (not any? missionaries and not any? traders and recruitment-costs = 0) "Cost-free extinction recovery"
+  set foundation-treasury 25 go
+  require (count missionaries = 1 and count traders = 1 and foundation-treasury = 0) "Late funded recovery"
+  print "PASS S5-I: cadence/caps, one-time costs, scarce funds, living detention, extinction and late recovery"
+end
+
+to setup-political-scenario [scenario seed]
+  trade-fixture 12 12 seed
+  if member? scenario ["all-minimum" "all-maximum"] [
+    let maximum? scenario = "all-maximum"
+    set initial-missionaries ifelse-value maximum? [40] [0]
+    set initial-traders ifelse-value maximum? [40] [0]
+    set missionary-effectiveness ifelse-value maximum? [.5] [0]
+    set trade-attractiveness ifelse-value maximum? [1] [0]
+    set royal-intolerance ifelse-value maximum? [1] [0]
+    set tech-decay-rate ifelse-value maximum? [.04] [0]
+    set religion-trade-weight ifelse-value maximum? [.8] [0]
+    set independence-effort ifelse-value maximum? [1] [0]
+    random-seed seed setup
+  ]
+  if scenario = "failed-expansion" [
+    set royal-intolerance 1 set independence-effort 0
+    ask planets with [not foundation?] [
+      set religion 0 set tech-dependency 0 set trade-trust 0
+      set hostility 1 set baseline-hostility 1 set taboo 1
+    ]
+  ]
+  if scenario = "stable-control" [
+    set initial-missionaries 40 set initial-traders 40
+    set missionary-effectiveness .5 set trade-attractiveness 1
+    set royal-intolerance 0 set independence-effort 0 set tech-decay-rate .005
+    random-seed seed setup
+  ]
+  if scenario = "political-resistance" [
+    set royal-intolerance 1 set independence-effort 0
+    ask planets with [not foundation?] [
+      set religion .9 set tech-dependency .5 set trade-trust .8 set temple? true
+      set hostility .8 set baseline-hostility .8 set taboo .3
+    ]
+    initialize-policy-wealth
+  ]
+end
+
+to check-political-runs
+  ;; Default plus each slider's two endpoints, then both simultaneous corners.
+  foreach [1 2 3 42 101] [seed ->
+    trade-fixture 12 12 seed
+    repeat 450 [ go-political-check ]
+  ]
+  foreach [["initial-missionaries" 0 40] ["initial-traders" 0 40]
+    ["missionary-effectiveness" 0 .5] ["trade-attractiveness" 0 1]
+    ["royal-intolerance" 0 1] ["tech-decay-rate" 0 .04]
+    ["religion-trade-weight" 0 .8] ["independence-effort" 0 1]] [setting ->
+    foreach but-first setting [value ->
+      trade-fixture 12 12 101
+      run (word "set " first setting " " value)
+      random-seed 101 setup
+      repeat 450 [go-political-check]
+    ]
+  ]
+  foreach ["failed-expansion" "stable-control" "political-resistance"] [scenario ->
+    foreach [101 102 103] [seed ->
+      setup-political-scenario scenario seed
+      let peak-control 0 let embargo-observed? false
+      repeat 450 [
+        go-political-check
+        set peak-control max (list peak-control controlled-planets)
+        if any? planets with [embargoed?] [set embargo-observed? true]
+      ]
+      if scenario = "failed-expansion" [require (peak-control = 0) "Failed expansion fixture gained control"]
+      if scenario = "stable-control" [require (controlled-planets > 0) "Favorable fixture did not sustain control"]
+      if scenario = "political-resistance" [require embargo-observed? "Rising influence did not trigger resistance"]
+      print (list "S5 scenario" scenario "seed" seed "peak-control" peak-control
+        "final-control" controlled-planets "kingdoms" controlled-kingdoms "treasury" foundation-treasury)
+    ]
+  ]
+  foreach ["all-minimum" "all-maximum"] [scenario ->
+    setup-political-scenario scenario 101
+    repeat 450 [go-political-check]
+  ]
+  ;; Five complete 450-tick runs between resets; stress all helpers another
+  ;; 2000 times at the fixed horizon without changing the production clock.
+  foreach [1 2 3 42 101] [seed ->
+    trade-fixture 40 40 seed repeat 450 [go-political-check]
+    repeat 2000 [
+      set trade-income-this-tick 0
+      process-environment process-missionaries process-traders process-trade-routes
+      process-kingdom-policies recruit-agents update-politics-effects update-control
+      assert-valid-model-state
+    ]
+    let before trade-trace go go-once require (trade-trace = before) "S5-J: horizon moved"
+  ]
+  print "PASS S5-J: defaults, each slider endpoint, three scenarios and five 2450-update stress runs"
+end
+
+;; Verify political invariants after every complete production tick. Economic
+;; unit fixtures may deliberately force mixed policies within one kingdom.
+to go-political-check
+  go
+  assert-valid-model-state
+  foreach [1 2 3 4] [group ->
+    let capital first sort planets with [kingdom-id = group and capital?]
+    require-policy group [policy] of capital
+    require ([last-policy-change-tick] of capital <= ticks) "Future policy transition"
+  ]
+  require (all? planets with [not foundation?] [
+    (control-streak = 0 or planet-leverage >= .58) and controlled? = (control-streak >= 5)
+  ]) "Control inconsistent with current leverage"
+  require (count missionaries + total-executed-missionaries = initial-missionaries + total-recruited-missionaries
+    and count traders + total-executed-traders = initial-traders + total-recruited-traders)
+    "Integrated recruitment/death conservation"
+end

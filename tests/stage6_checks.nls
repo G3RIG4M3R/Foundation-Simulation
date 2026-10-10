@@ -1,0 +1,51 @@
+;; Interface fixtures run only in temporary test models.
+to check-stage6
+  trade-fixture 12 12 123
+  let original state-snapshot
+  random-seed 17 let next-draw random-float 1 random-seed 17
+  foreach ["kingdom" "religion" "dependency" "control"] [view ->
+    set view-mode view update-appearance
+    require (state-snapshot = original) "S6-E: view altered simulation state"
+    require (all? missionaries [shape = "missionary" and color = cyan]
+      and all? traders [shape = "trader" and color = white]) "S6-D: travelers lost visual identity"
+    require (all? planets with [capital?] [shape = "capital"]
+      and [shape = "foundation" and color = yellow] of terminus-planet) "S6-D: capital/Foundation markers"
+  ]
+  require (random-float 1 = next-draw) "S6-E: rendering consumed RNG"
+  let colors map [level -> religion-color level] [0 .25 .5 .75 1]
+  require (first colors = [220 70 60] and last colors = [60 210 60]) "S6-D: religion legend endpoints"
+  (foreach but-last colors but-first colors [[a b] ->
+    require (item 0 a >= item 0 b and item 1 a <= item 1 b and a != b) "S6-D: nonmonotonic religion colors"
+  ])
+  set view-mode "kingdom" update-appearance
+  require (length remove-duplicates map [world -> [color] of world] sort planets = 6) "S6-D: distinct kingdom colors"
+  ask planets with [kingdom-id = 1] [set-government-policy "restrict"]
+  ask planets with [kingdom-id = 2] [set-government-policy "embargo"]
+  update-appearance
+  require (all? planets with [kingdom-id = 1] [member? "R" label]
+    and all? planets with [kingdom-id = 2] [member? "E" label]) "S6-D: policy labels"
+  ;; Exact same full trajectory when paused redraws/view changes are interleaved.
+  trade-fixture 12 12 123
+  let fixed run-trade-trace 123 false
+  require (fixed = run-trade-trace 123 true) "S6-E: view switching changed full 450-tick trace"
+  setup
+  require (ticks = 0 and controlled-planets = 0 and controlled-kingdoms = 0
+    and foundation-treasury = 200 and count trade-routes = 0
+    and total-executed-missionaries + total-executed-traders = 0) "S6-B: setup reset"
+  go-once require (ticks = 1) "S6-B: go-once not exactly one tick"
+  repeat 449 [go]
+  go go-once require (ticks = 450 and model-valid?) "S6-B: horizon"
+  set view-mode "kingdom"
+  set stage6-checks-passed? true
+  print "PASS S6-B/D/E: reset/single-step/horizon, colors/markers/policy labels, pure rendering and full seed replay"
+end
+
+;; Sets known histogram boundaries only for chart tests, not simulation runs.
+to interface-histogram-fixture
+  foreach sort planets with [not foundation?] [world -> ask world [
+    set religion ifelse-value (planet-id <= 10) [0] [ifelse-value (planet-id <= 20) [.5] [1]]
+  ]]
+  clear-all-plots
+  setup-plots
+  update-plots
+end
