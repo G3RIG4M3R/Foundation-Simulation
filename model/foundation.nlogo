@@ -1,3 +1,7 @@
+;; ========================================
+;; 1. GLOBAL VARIABLES AND AGENT DEFINITIONS
+;; ========================================
+
 breed [planets planet]
 breed [missionaries missionary]
 breed [traders trader]
@@ -23,6 +27,10 @@ globals [
   kingdom-policy-timer tick-limit terminus-planet
   total-recruited-missionaries total-recruited-traders last-recruitment-tick
 ]
+
+;; ========================================
+;; 2. WORLD INITIALIZATION
+;; ========================================
 
 ;; INITIALIZATION
 
@@ -172,6 +180,10 @@ to initialize-trader
   set wait-ticks 0
 end
 
+;; ========================================
+;; 3. PLANET MECHANICS
+;; ========================================
+
 ;; SCHEDULER: go is the only procedure that advances simulation time.
 
 to go
@@ -232,6 +244,10 @@ to initialize-policy-wealth
     ask capital [ set previous-policy-wealth baseline ]
   ]
 end
+
+;; ========================================
+;; 4. MISSIONARY BEHAVIOR
+;; ========================================
 
 to process-missionaries
   ask planets with [temple? and not foundation?] [ dismantle-repressed-temple ]
@@ -358,6 +374,10 @@ end
 to dismantle-repressed-temple
   if religion < 0.35 and member? policy ["restrict" "embargo"] [ set temple? false ]
 end
+
+;; ========================================
+;; 5. TRADER BEHAVIOR
+;; ========================================
 
 to process-traders
   ask traders [ step-trader ]
@@ -499,6 +519,10 @@ to renew-trade-route [origin destination sale-size]
   ]
 end
 
+;; ========================================
+;; 6. TECHNOLOGICAL DEPENDENCY
+;; ========================================
+
 to process-trade-routes
   ;; Exactly once after trader activity, including newly established routes.
   ask trade-routes [
@@ -507,6 +531,10 @@ to process-trade-routes
     if route-strength < 0.08 [ die ]
   ]
 end
+
+;; ========================================
+;; 7. KINGDOM POLITICS AND RESISTANCE
+;; ========================================
 
 to process-kingdom-policies
   if ticks mod 10 != 0 or ticks < kingdom-policy-timer [ stop ]
@@ -621,6 +649,10 @@ to update-control
     set controlled? (control-streak >= 5)
   ] ]
 end
+
+;; ========================================
+;; 8. STATISTICS AND METRICS
+;; ========================================
 
 ;; DISPLAY: sorted single-agent asks avoid consuming the simulation RNG.
 
