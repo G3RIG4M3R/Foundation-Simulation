@@ -896,7 +896,11 @@ to-report planet-state-valid?
   if not natural-number? kingdom-id or kingdom-id > 5 [ report false ]
   if not in-range? population 0.5 1.5 [ report false ]
   if not in-range? wealth 0 100 [ report false ]
-  if not in-range? previous-policy-wealth 0 100 [ report false ]
+  ;; A population-weighted mean of individually bounded wealth values can exceed
+  ;; 100 by a few ulps through floating-point summation (for example
+  ;; 100.00000000000001).  This tolerance validates the bounded state without
+  ;; changing any economic or political behavior.
+  if not in-range? previous-policy-wealth -1.0E-12 (100 + 1.0E-12) [ report false ]
   if not natural-number? last-policy-change-tick or not natural-number? policy-cooldown-until [ report false ]
   if not empty? filter [value -> not in-range? value 0 1] (list
     religion tech-dependency trade-trust tech-demand tech-health hostility taboo baseline-hostility
