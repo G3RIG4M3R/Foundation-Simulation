@@ -1,0 +1,56 @@
+{
+  "commands": [
+    [
+      "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+      "--headless",
+      "--model",
+      "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+      "--setup-file",
+      "/home/adam/repos/foundation-simulation/experiments/representative_timeseries.xml",
+      "--experiment",
+      "Representative failed",
+      "--threads",
+      "1",
+      "--table",
+      "/home/adam/repos/foundation-simulation/results/raw/representative_exports/failed.csv"
+    ],
+    [
+      "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+      "--headless",
+      "--model",
+      "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+      "--setup-file",
+      "/home/adam/repos/foundation-simulation/experiments/representative_timeseries.xml",
+      "--experiment",
+      "Representative intermediate",
+      "--threads",
+      "1",
+      "--table",
+      "/home/adam/repos/foundation-simulation/results/raw/representative_exports/intermediate.csv"
+    ],
+    [
+      "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+      "--headless",
+      "--model",
+      "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+      "--setup-file",
+      "/home/adam/repos/foundation-simulation/experiments/representative_timeseries.xml",
+      "--experiment",
+      "Representative highest observed",
+      "--threads",
+      "1",
+      "--table",
+      "/home/adam/repos/foundation-simulation/results/raw/representative_exports/highest_observed.csv"
+    ]
+  ],
+  "model_sha256": "2b1128866303076b485f60c05f9be3e772a1fe6a1e194027d796102e75441e56",
+  "experiment_sha256": "0f0d31945fda704b9628fb1eb29bd4dcc61d52d1ce14df061bf9e5631bf90e5e",
+  "selection_sha256": "df820eabe5fce808799b91667adf94f2013c53c5db8ad748df1d626f6e050705",
+  "source_export_sha256": {
+    "failed.csv": "1790345bb6ada320f2b5961f4aba71918c801cbdb269fb23af30740959ad290d",
+    "highest_observed.csv": "cb1d287004573582c8f78cbf76df4d50eb33d8a803c3ed4eeff9972624ffaca8",
+    "intermediate.csv": "e2db799e907a5c3ad71ac3172bde05ec84e5d48de9827d3e5dbe5b89f22ee904"
+  },
+  "combined_csv_sha256": "58a09ad16ff92eb60e525280d0c36f38d71b061e579c927161ceb8b2bfc1ff62",
+  "selection_rule": "minimum cell mean; cell nearest midpoint of minimum and maximum; maximum cell mean; within each cell terminal control nearest the cell mean, ties by smallest production run number"
+}

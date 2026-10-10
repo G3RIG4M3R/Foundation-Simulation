@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+    "--headless",
+    "--model",
+    "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+    "--setup-file",
+    "/home/adam/repos/foundation-simulation/experiments/pilot.xml",
+    "--experiment",
+    "Foundation range pilot",
+    "--table",
+    "/home/adam/repos/foundation-simulation/results/pilot/pilot.csv",
+    "--threads",
+    "1"
+  ],
+  "started_utc": "2026-10-06T13:38:54.081715+00:00",
+  "model_sha256": "2b1128866303076b485f60c05f9be3e772a1fe6a1e194027d796102e75441e56",
+  "experiment_sha256": "08b660b574b24957550ecd63ee7afe98771c3d8099f29556b867df9c5d66ed9c",
+  "seed_scheme": "100000 + behaviorspace-run-number (unless explicit representative replay seed)",
+  "status": "runtime completed; data audit required",
+  "elapsed_seconds": 17.209952318000433,
+  "returncode": 0,
+  "finished_utc": "2026-10-06T13:39:11.292296+00:00",
+  "csv_sha256": "4785abb6ad99280e793c14352c6e1b1e0e4763f68cab52cc39288d8d2c0fbc28"
+}

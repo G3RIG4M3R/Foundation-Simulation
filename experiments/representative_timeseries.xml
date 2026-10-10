@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">
+<experiments>
+  <experiment name="Representative failed" repetitions="1" runMetricsEveryStep="true">
+    <setup>set missionary-effectiveness 0.1 set royal-intolerance 0.8 set initial-missionaries 12 set initial-traders 12 set trade-attractiveness 0.6 set tech-decay-rate 0.015 set religion-trade-weight 0.55 set independence-effort 0.15 set view-mode "kingdom" random-seed 100121 setup</setup>
+    <go>go</go>
+    <timeLimit steps="450" />
+    <metric>control-fraction</metric>
+    <metric>cumulative-trade-profit</metric>
+    <metric>controlled-kingdoms</metric>
+    <metric>mean-religion</metric>
+    <metric>mean-dependency</metric>
+    <metric>ticks</metric>
+    <metric>model-valid?</metric>
+    <metric>netlogo-version</metric>
+  </experiment>
+  <experiment name="Representative intermediate" repetitions="1" runMetricsEveryStep="true">
+    <setup>set missionary-effectiveness 0.35 set royal-intolerance 0.4 set initial-missionaries 12 set initial-traders 12 set trade-attractiveness 0.6 set tech-decay-rate 0.015 set religion-trade-weight 0.55 set independence-effort 0.15 set view-mode "kingdom" random-seed 100742 setup</setup>
+    <go>go</go>
+    <timeLimit steps="450" />
+    <metric>control-fraction</metric>
+    <metric>cumulative-trade-profit</metric>
+    <metric>controlled-kingdoms</metric>
+    <metric>mean-religion</metric>
+    <metric>mean-dependency</metric>
+    <metric>ticks</metric>
+    <metric>model-valid?</metric>
+    <metric>netlogo-version</metric>
+  </experiment>
+  <experiment name="Representative highest observed" repetitions="1" runMetricsEveryStep="true">
+    <setup>set missionary-effectiveness 0.4 set royal-intolerance 0.2 set initial-missionaries 12 set initial-traders 12 set trade-attractiveness 0.6 set tech-decay-rate 0.015 set religion-trade-weight 0.55 set independence-effort 0.15 set view-mode "kingdom" random-seed 100848 setup</setup>
+    <go>go</go>
+    <timeLimit steps="450" />
+    <metric>control-fraction</metric>
+    <metric>cumulative-trade-profit</metric>
+    <metric>controlled-kingdoms</metric>
+    <metric>mean-religion</metric>
+    <metric>mean-dependency</metric>
+    <metric>ticks</metric>
+    <metric>model-valid?</metric>
+    <metric>netlogo-version</metric>
+  </experiment>
+</experiments>

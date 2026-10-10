@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+    "--headless",
+    "--model",
+    "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+    "--setup-file",
+    "/home/adam/repos/foundation-simulation/experiments/boundary_pilot.xml",
+    "--experiment",
+    "Foundation boundary pilot",
+    "--table",
+    "/home/adam/repos/foundation-simulation/results/pilot/boundary_pilot.csv",
+    "--threads",
+    "4"
+  ],
+  "started_utc": "2026-10-10T10:38:56.964697+00:00",
+  "model_sha256": "2b1128866303076b485f60c05f9be3e772a1fe6a1e194027d796102e75441e56",
+  "experiment_sha256": "f401126e359c9abf942316510ee4a61633e4034fd86cc042ff1f030a78dfbb90",
+  "seed_scheme": "100000 + behaviorspace-run-number (unless explicit representative replay seed)",
+  "status": "runtime completed; data audit required",
+  "elapsed_seconds": 38.539353302999984,
+  "returncode": 0,
+  "finished_utc": "2026-10-10T10:39:35.504709+00:00",
+  "csv_sha256": "00d57af62753ad6e27e5c4c780aed9f0ebed3592226682448cc105770456162e"
+}

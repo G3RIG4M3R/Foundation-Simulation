@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+    "--headless",
+    "--model",
+    "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+    "--setup-file",
+    "/home/adam/repos/foundation-simulation/experiments/smoke_test.xml",
+    "--experiment",
+    "Foundation Smoke Test",
+    "--table",
+    "/home/adam/repos/foundation-simulation/results/smoke/parallel.csv",
+    "--threads",
+    "4"
+  ],
+  "started_utc": "2026-10-10T10:40:06.409387+00:00",
+  "model_sha256": "2b1128866303076b485f60c05f9be3e772a1fe6a1e194027d796102e75441e56",
+  "experiment_sha256": "812cdfe702b64372df61fe50ff0c8910401d2a4482a971bbe8bf0514f79ab726",
+  "seed_scheme": "100000 + behaviorspace-run-number (unless explicit representative replay seed)",
+  "status": "runtime completed; data audit required",
+  "elapsed_seconds": 10.90826647299997,
+  "returncode": 0,
+  "finished_utc": "2026-10-10T10:40:17.318178+00:00",
+  "csv_sha256": "c07780ea5ebb72af22cf37c56557d8839487172cc9759d31d5286aa97b029c17"
+}

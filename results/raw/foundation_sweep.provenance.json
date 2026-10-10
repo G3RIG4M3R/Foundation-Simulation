@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+    "--headless",
+    "--model",
+    "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+    "--setup-file",
+    "/home/adam/repos/foundation-simulation/experiments/foundation_sweep.xml",
+    "--experiment",
+    "Foundation Religious-Economic Tipping Point",
+    "--table",
+    "/home/adam/repos/foundation-simulation/results/raw/foundation_sweep.csv",
+    "--threads",
+    "4"
+  ],
+  "started_utc": "2026-10-10T10:40:22.694684+00:00",
+  "model_sha256": "2b1128866303076b485f60c05f9be3e772a1fe6a1e194027d796102e75441e56",
+  "experiment_sha256": "4d3dcda024dc41a16a29d1f9c12760df7f791cc8ec04930255073d5457b6c00f",
+  "seed_scheme": "100000 + behaviorspace-run-number (unless explicit representative replay seed)",
+  "status": "runtime completed; data audit required",
+  "elapsed_seconds": 78.50740705999999,
+  "returncode": 0,
+  "finished_utc": "2026-10-10T10:41:41.202475+00:00",
+  "csv_sha256": "6e303c92a8e31471322df495ad3e9ac385509caad433b9d61d68d846dc40d05e"
+}

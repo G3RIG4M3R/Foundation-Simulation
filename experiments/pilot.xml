@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">
+<experiments>
+  <experiment name="Foundation range pilot" repetitions="3" runMetricsEveryStep="false">
+    <setup>random-seed (100000 + behaviorspace-run-number) setup</setup>
+    <go>go</go>
+    <timeLimit steps="450" />
+    <metric>control-fraction</metric>
+    <metric>cumulative-trade-profit</metric>
+    <metric>controlled-planets</metric>
+    <metric>controlled-kingdoms</metric>
+    <metric>mean-religion</metric>
+    <metric>mean-dependency</metric>
+    <metric>total-executed-missionaries</metric>
+    <metric>total-executed-traders</metric>
+    <metric>foundation-treasury</metric>
+    <metric>recruitment-costs</metric>
+    <metric>total-successful-trades</metric>
+    <metric>ticks</metric>
+    <metric>model-valid?</metric>
+    <metric>netlogo-version</metric>
+    <metric>100000 + behaviorspace-run-number</metric>
+    <metric>(list missionary-effectiveness royal-intolerance initial-missionaries initial-traders trade-attractiveness tech-decay-rate religion-trade-weight independence-effort view-mode)</metric>
+    <enumeratedValueSet variable="missionary-effectiveness">
+      <value value="0.1" />
+      <value value="0.4" />
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="royal-intolerance">
+      <value value="0.2" />
+      <value value="0.8" />
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-missionaries">
+      <value value="12" />
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-traders">
+      <value value="12" />
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="trade-attractiveness">
+      <value value="0.6" />
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="tech-decay-rate">
+      <value value="0.015" />
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="religion-trade-weight">
+      <value value="0.55" />
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="independence-effort">
+      <value value="0.15" />
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="view-mode">
+      <value value="&quot;kingdom&quot;" />
+    </enumeratedValueSet>
+  </experiment>
+</experiments>

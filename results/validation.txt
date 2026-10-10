@@ -1,0 +1,1 @@
+PASS: Foundation Religious-Economic Tipping Point: 980 runs, 49 cells x 20, 980 rows; seeds 100001–100980, tick 450

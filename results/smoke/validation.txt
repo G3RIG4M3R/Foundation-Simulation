@@ -1,0 +1,1 @@
+PASS: Foundation Smoke Test: 4 runs, 2 cells x 2, 4 rows; seeds 100001–100004, tick 20
