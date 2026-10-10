@@ -1,0 +1,4 @@
+regime,initial_traders,trade_attractiveness,seed,first_widespread_tick,ticks_widespread,last_100_ticks_widespread,terminal_control_fraction,terminal_kingdoms
+below boundary,8,0.6,500003,not observed,0,0,0.2,0
+boundary,16,0.6,500121,967,26,26,0.5,1
+above boundary,20,0.8,500207,620,381,100,0.6333333333333333,2

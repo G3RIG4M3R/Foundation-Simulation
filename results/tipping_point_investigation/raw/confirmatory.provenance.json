@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+    "--headless",
+    "--model",
+    "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+    "--setup-file",
+    "/home/adam/repos/foundation-simulation/experiments/tipping_confirmatory.xml",
+    "--experiment",
+    "Confirmatory trader-attractiveness tipping grid",
+    "--table",
+    "/home/adam/repos/foundation-simulation/results/tipping_point_investigation/raw/confirmatory.csv",
+    "--threads",
+    "4"
+  ],
+  "started_utc": "2026-10-10T20:59:43.515255+00:00",
+  "model_sha256": "a93bfd37fb6abab3f7d6f57a4c828564a5d3fa83ded4e82da4176c108b10172a",
+  "experiment_sha256": "0a2cc05189d0ba3344f80feafa7b99d16b6b0ca65a6d1f2c5cbbb47a5e159b56",
+  "seed_scheme": "100000 + behaviorspace-run-number (unless explicit representative replay seed)",
+  "status": "runtime completed; data audit required",
+  "elapsed_seconds": 77.47788065900022,
+  "returncode": 0,
+  "finished_utc": "2026-10-10T21:01:02.216779+00:00",
+  "csv_sha256": "dcfc4e9e2ef8aa92a9a11b17695e65c7b72c2037357717e40d8de294cc352d19"
+}

@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+    "--headless",
+    "--model",
+    "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+    "--setup-file",
+    "/home/adam/repos/foundation-simulation/experiments/tipping_duration_pilot.xml",
+    "--experiment",
+    "Tipping duration 2000",
+    "--table",
+    "/home/adam/repos/foundation-simulation/results/tipping_point_investigation/raw/duration_2000.csv",
+    "--threads",
+    "4"
+  ],
+  "started_utc": "2026-10-10T20:53:30.407200+00:00",
+  "model_sha256": "5affcff6d6a85bb163fbe677f8fbbb6514c35eb59d8efe993e53a9da0a148951",
+  "experiment_sha256": "8a3609ffd2f43f37f6b1e6a6ad553118af984bb13d80aa7bd2c68c393a5faa25",
+  "seed_scheme": "100000 + behaviorspace-run-number (unless explicit representative replay seed)",
+  "status": "runtime completed; data audit required",
+  "elapsed_seconds": 15.557639791997644,
+  "returncode": 0,
+  "finished_utc": "2026-10-10T20:53:45.965163+00:00",
+  "csv_sha256": "8e0fb28463f993886c3595df7dadf01176f2eecd5e1658bcfca5ca2e063055ea"
+}

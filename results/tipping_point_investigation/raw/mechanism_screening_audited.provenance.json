@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+    "--headless",
+    "--model",
+    "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+    "--setup-file",
+    "/home/adam/repos/foundation-simulation/experiments/tipping_screening.xml",
+    "--experiment",
+    "Tipping mechanism screening",
+    "--table",
+    "/home/adam/repos/foundation-simulation/results/tipping_point_investigation/raw/mechanism_screening_audited.csv",
+    "--threads",
+    "4"
+  ],
+  "started_utc": "2026-10-10T20:56:58.681698+00:00",
+  "model_sha256": "a93bfd37fb6abab3f7d6f57a4c828564a5d3fa83ded4e82da4176c108b10172a",
+  "experiment_sha256": "d2709af38d01dbba8a397932d86b82ad76b10a5e8002acecac3ad6e4c60eb8a1",
+  "seed_scheme": "100000 + behaviorspace-run-number (unless explicit representative replay seed)",
+  "status": "runtime completed; data audit required",
+  "elapsed_seconds": 65.02950160000182,
+  "returncode": 0,
+  "finished_utc": "2026-10-10T20:58:05.062631+00:00",
+  "csv_sha256": "2afe6fa82b234c14808211f8daa2e8c3a649bd4e610759b37c4db37f3fa60e7f"
+}

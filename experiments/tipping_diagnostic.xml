@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">
+<experiments><experiment name="Tipping diagnostic" repetitions="1" runMetricsEveryStep="false">
+  <setup>set tick-limit 1000 set missionary-effectiveness 0.5 set royal-intolerance 0 set initial-missionaries 12 set initial-traders 12 set trade-attractiveness 0.6 set tech-decay-rate 0.005 set religion-trade-weight 0.55 set independence-effort 0.15 set view-mode "kingdom" random-seed 300005 setup</setup>
+  <go>go</go><timeLimit steps="1000"/><exitCondition>ticks &gt;= active-tick-limit</exitCondition>
+  <metric>model-valid?</metric><metric>empty? filter [world -&gt; not [planet-state-valid?] of world] sort planets</metric>
+  <metric>empty? filter [visitor -&gt; not [missionary-state-valid?] of visitor] sort missionaries</metric>
+  <metric>empty? filter [visitor -&gt; not [trader-state-valid?] of visitor] sort traders</metric>
+  <metric>map [world -&gt; (list [planet-id] of world [kingdom-id] of world [wealth] of world [previous-policy-wealth] of world [religion] of world [tech-dependency] of world [trade-trust] of world [tech-demand] of world [tech-health] of world [hostility] of world [taboo] of world [baseline-hostility] of world [policy] of world [embargoed?] of world [controlled?] of world [control-streak] of world [last-policy-change-tick] of world [policy-cooldown-until] of world)] filter [world -&gt; not [planet-state-valid?] of world] sort planets</metric>
+  <metric>not any? trade-routes with [not is-planet? end1 or not is-planet? end2 or end1 = end2 or not in-range? route-strength 0 1 or not natural-number? route-age]</metric>
+  <metric>count missionaries</metric><metric>count traders</metric><metric>last-recruitment-tick</metric><metric>ticks</metric>
+</experiment></experiments>

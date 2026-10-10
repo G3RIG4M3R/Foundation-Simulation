@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">
+<experiments>
+  <experiment name="Representative below boundary" repetitions="1" runMetricsEveryStep="true">
+    <setup>set tick-limit 1000 set missionary-effectiveness 0.5 set royal-intolerance 0 set initial-missionaries 12 set initial-traders 8 set trade-attractiveness 0.6 set tech-decay-rate 0.015 set religion-trade-weight 0.8 set independence-effort 0.15 set view-mode "kingdom" random-seed 500003 setup</setup>
+    <go>go</go><timeLimit steps="1000"/><exitCondition>ticks &gt;= active-tick-limit</exitCondition>
+    <metric>control-fraction</metric><metric>controlled-kingdoms</metric><metric>mean-religion</metric><metric>mean-dependency</metric><metric>ticks</metric><metric>model-valid?</metric>
+  </experiment>
+  <experiment name="Representative boundary" repetitions="1" runMetricsEveryStep="true">
+    <setup>set tick-limit 1000 set missionary-effectiveness 0.5 set royal-intolerance 0 set initial-missionaries 12 set initial-traders 16 set trade-attractiveness 0.6 set tech-decay-rate 0.015 set religion-trade-weight 0.8 set independence-effort 0.15 set view-mode "kingdom" random-seed 500121 setup</setup>
+    <go>go</go><timeLimit steps="1000"/><exitCondition>ticks &gt;= active-tick-limit</exitCondition>
+    <metric>control-fraction</metric><metric>controlled-kingdoms</metric><metric>mean-religion</metric><metric>mean-dependency</metric><metric>ticks</metric><metric>model-valid?</metric>
+  </experiment>
+  <experiment name="Representative above boundary" repetitions="1" runMetricsEveryStep="true">
+    <setup>set tick-limit 1000 set missionary-effectiveness 0.5 set royal-intolerance 0 set initial-missionaries 12 set initial-traders 20 set trade-attractiveness 0.8 set tech-decay-rate 0.015 set religion-trade-weight 0.8 set independence-effort 0.15 set view-mode "kingdom" random-seed 500207 setup</setup>
+    <go>go</go><timeLimit steps="1000"/><exitCondition>ticks &gt;= active-tick-limit</exitCondition>
+    <metric>control-fraction</metric><metric>controlled-kingdoms</metric><metric>mean-religion</metric><metric>mean-dependency</metric><metric>ticks</metric><metric>model-valid?</metric>
+  </experiment>
+</experiments>

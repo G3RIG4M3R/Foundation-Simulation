@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/home/adam/tools/NetLogo-6.4.0-64/NetLogo_Console",
+    "--headless",
+    "--model",
+    "/home/adam/repos/foundation-simulation/model/foundation.nlogo",
+    "--setup-file",
+    "/home/adam/repos/foundation-simulation/experiments/tipping_boundary_search.xml",
+    "--experiment",
+    "Tipping boundary search",
+    "--table",
+    "/home/adam/repos/foundation-simulation/results/tipping_point_investigation/raw/boundary_search.csv",
+    "--threads",
+    "4"
+  ],
+  "started_utc": "2026-10-10T20:58:22.703340+00:00",
+  "model_sha256": "a93bfd37fb6abab3f7d6f57a4c828564a5d3fa83ded4e82da4176c108b10172a",
+  "experiment_sha256": "aea062fe12d5658894fd7daaeac453c1216941cdaaed652758fc3742c7501fea",
+  "seed_scheme": "100000 + behaviorspace-run-number (unless explicit representative replay seed)",
+  "status": "runtime completed; data audit required",
+  "elapsed_seconds": 64.13300381199952,
+  "returncode": 0,
+  "finished_utc": "2026-10-10T20:59:28.160609+00:00",
+  "csv_sha256": "74334ec643bf61a0ec969d8e13c3a48838e8f2ce773c2c431bd2bdffc19867b6"
+}
