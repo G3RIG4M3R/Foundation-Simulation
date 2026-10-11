@@ -127,7 +127,7 @@ analysis command intentionally reads the audited files under this directory.
 - `processed/boundary_search_summary.csv`: adaptive-grid summaries.
 - `processed/confirmatory_cell_summary.csv`: t intervals and Wilson intervals.
 - `processed/representative_persistence.csv`: crossing/persistence diagnostics.
-- `figures/`: five generated plots.
+- `figures/`: six generated plots.
 
 The transition is conditional on maximum missionary effectiveness, zero royal
 intolerance, high religion-assisted trade admission, and a 1,000-tick horizon;
@@ -139,3 +139,19 @@ Kingdom control is also stricter than planet control because it requires a
 controlled capital and 60% population-weighted control. A future extension
 should record per-tick threshold occupancy for every confirmatory run and add
 independent validation cells at 14 and 18 traders without reusing these seeds.
+
+## Final delivery audit corrections
+
+The duration-pilot figure now uses Student t(0.975, 4) = 2.776445 for its
+five observations; its raw observations are unchanged. Confirmatory control
+and kingdom-count means use t(0.975, 19) = 2.093024; threshold probabilities
+use Wilson intervals. The control heatmap annotates mean ± 95% CI half-width.
+The compact `representative_control_timeseries.png` repeats the control panel
+from the same three measured traces for readable two-page reporting.
+
+Historical provenance sidecars contain a generic, incorrect `seed_scheme`
+label. The authoritative seed commands are in each hashed XML and recorded seed
+columns (confirmation: 500000 + run number). Existing sidecars and raw tables
+are preserved; the wrapper now derives new provenance from the selected XML setup.
+The report and presentation explicitly disclose AI-assisted development and
+fictional modeling assumptions.

@@ -12,6 +12,7 @@ RAW = BASE / "raw"
 PROCESSED = BASE / "processed"
 FIGURES = BASE / "figures"
 T19 = 2.093024054408263
+T4 = 2.7764451051977987
 
 
 def table(path):
@@ -57,6 +58,8 @@ def duration_summary():
             "duration_ticks": horizon, "n": len(rows),
             "control_mean": statistics.fmean(values),
             "control_sd": statistics.stdev(values),
+            "control_ci_low": statistics.fmean(values) - T4 * statistics.stdev(values) / math.sqrt(5),
+            "control_ci_high": statistics.fmean(values) + T4 * statistics.stdev(values) / math.sqrt(5),
             "religion_mean": statistics.fmean(float(r["mean-religion"]) for r in rows),
             "dependency_mean": statistics.fmean(float(r["mean-dependency"]) for r in rows),
             "widespread_probability": sum(v >= .5 for v in values) / len(values),
@@ -86,6 +89,10 @@ def confirmatory_summary():
         widespread = sum(value >= .5 for value in control)
         low, high = wilson(widespread, 20)
         kingdoms = sum(float(r["controlled-kingdoms"]) >= 1 for r in samples)
+        kingdom_values = [float(r["controlled-kingdoms"]) for r in samples]
+        kingdom_mean = statistics.fmean(kingdom_values)
+        kingdom_sd = statistics.stdev(kingdom_values)
+        kingdom_half = T19 * kingdom_sd / math.sqrt(20)
         kingdom_low, kingdom_high = wilson(kingdoms, 20)
         output.append({
             "initial_traders": traders, "trade_attractiveness": attractiveness, "n": 20,
@@ -95,6 +102,9 @@ def confirmatory_summary():
             "widespread_wilson_low": low, "widespread_wilson_high": high,
             "kingdom_count": kingdoms, "kingdom_probability": kingdoms / 20,
             "kingdom_wilson_low": kingdom_low, "kingdom_wilson_high": kingdom_high,
+            "kingdom_mean": kingdom_mean, "kingdom_sd": kingdom_sd,
+            "kingdom_ci_low": kingdom_mean - kingdom_half,
+            "kingdom_ci_high": kingdom_mean + kingdom_half,
             "religion_mean": statistics.fmean(float(r["mean-religion"]) for r in samples),
             "dependency_mean": statistics.fmean(float(r["mean-dependency"]) for r in samples),
             "profit_mean": statistics.fmean(float(r["cumulative-trade-profit"]) for r in samples),
@@ -156,7 +166,12 @@ def plots(duration, summary):
                           cmap="viridis")
         for y in range(len(attraction)):
             for x in range(len(traders)):
-                ax.text(x, y, f"{matrix[y, x]:.2f}", ha="center", va="center",
+                cell = lookup[traders[x], attraction[y]]
+                annotation = f"{matrix[y, x]:.2f}"
+                if field == "control_mean":
+                    half = (cell["control_ci_high"] - cell["control_ci_low"]) / 2
+                    annotation += f"\n±{half:.2f}"
+                ax.text(x, y, annotation, ha="center", va="center",
                         color="white" if matrix[y, x] < .55 else "black")
         ax.set(xticks=range(len(traders)), xticklabels=traders,
                yticks=range(len(attraction)), yticklabels=attraction,
@@ -165,7 +180,7 @@ def plots(duration, summary):
         fig.tight_layout(); fig.savefig(FIGURES / name, dpi=180); plt.close(fig)
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.errorbar([r["duration_ticks"] for r in duration], [r["control_mean"] for r in duration],
-                yerr=[r["control_sd"] / math.sqrt(r["n"]) * T19 for r in duration],
+                yerr=[r["control_sd"] / math.sqrt(r["n"]) * T4 for r in duration],
                 marker="o", capsize=4)
     ax.axhline(.5, color="firebrick", linestyle="--", label="Widespread threshold")
     ax.set(xlabel="Duration (ticks)", ylabel="Mean final control fraction",
@@ -221,6 +236,18 @@ def representative_analysis():
     axes[0].legend(fontsize=8); axes[-1].set_xlabel("Tick")
     fig.suptitle("Representative confirmatory trajectories")
     fig.tight_layout(); fig.savefig(FIGURES / "representative_timeseries.png", dpi=180)
+    # Compact control-only panel for the strict two-page report; same measured traces.
+    compact, ax = plt.subplots(figsize=(8, 2.9))
+    for label, filename, traders, attraction, seed in cases:
+        rows = table(RAW / filename)
+        ax.plot([float(r["ticks"]) for r in rows],
+                [float(r["control-fraction"]) for r in rows],
+                label=f"{traders} traders, attraction {attraction:g} (seed {seed})")
+    ax.axhline(.5, color="firebrick", linestyle="--", linewidth=1)
+    ax.set(xlabel="Tick", ylabel="Control fraction", ylim=(0, 1), xlim=(0, 1000))
+    ax.legend(fontsize=8, loc="upper left"); ax.grid(alpha=.2)
+    compact.tight_layout(); compact.savefig(FIGURES / "representative_control_timeseries.png", dpi=180)
+    plt.close(compact)
     plt.close(fig)
     return output
 
@@ -236,7 +263,7 @@ def main():
     write(PROCESSED / "confirmatory_cell_summary.csv", summary)
     plots(duration, summary)
     write(PROCESSED / "representative_persistence.csv", representative_analysis())
-    print("PASS: 25 duration-pilot, 300 confirmatory, and 3 representative runs audited; summaries and five figures written")
+    print("PASS: 25 duration-pilot, 300 confirmatory, and 3 representative runs audited; summaries and six figures written")
 
 
 if __name__ == "__main__":

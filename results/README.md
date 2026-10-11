@@ -1,7 +1,17 @@
 # Experimental results
 
+The selected final submission uses the [economic-dependency confirmatory
+investigation](tipping_point_investigation/README.md), with
+`experiments/tipping_confirmatory.xml` (300 runs, 1,000 ticks). Its raw tables,
+processed summaries and final figures are under `tipping_point_investigation/`.
+The following sections describe the historical Stage 8 experiment and its
+reproduction options; they are retained separately and are not pooled with the
+confirmatory results.
+
+## Historical missionary × intolerance experiment
+
 The existing measured baseline experiment asks whether missionary effectiveness can overcome royal
-intolerance and yield stable Foundation control while all other controls remain
+intolerance and yield Foundation control by the terminal tick while all other controls remain
 at their documented defaults. The preregistered grid uses missionary
 effectiveness 0.10–0.40 in 0.05 increments and royal intolerance 0.20–0.80 in
 0.10 increments. Each of the 49 cells has 20 runs of 450 ticks. Run `n` uses seed
@@ -32,7 +42,7 @@ point is therefore **not observed** throughout the grid. The strongest cell is
 missionary effectiveness 0.40 and royal intolerance 0.20: mean control fraction
 0.0283, sample standard deviation 0.0329, and 95% Student t interval
 [0.0129, 0.0437]. This corresponds to an average of 0.85 controlled worlds out
-of 30, far below stable system-wide control. Across all 980 runs, 105 ended with
+of 30, far below widespread terminal control. Across all 980 runs, 105 ended with
 at least one controlled world, the maximum in any run was three worlds, and no
 run ended with a controlled kingdom.
 

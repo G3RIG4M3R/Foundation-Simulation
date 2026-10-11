@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -19,10 +20,14 @@ def run(home, xml, name, csv, threads=1):
     csv.parent.mkdir(parents=True,exist_ok=True)
     provenance=csv.with_suffix('.provenance.json')
     if csv.exists() or provenance.exists(): raise ValueError(f'Refusing to overwrite evidence: {csv}')
+    experiment = next((e for e in ET.parse(xml).getroot().findall('experiment')
+                       if e.get('name') == name), None)
+    if experiment is None: raise ValueError(f'Experiment not found: {name}')
     cmd=[str(Path(home).resolve()/'NetLogo_Console'),'--headless','--model',str(model),
          '--setup-file',str(xml),'--experiment',name,'--table',str(csv),'--threads',str(threads)]
     info={'command':cmd,'started_utc':datetime.now(timezone.utc).isoformat(),
-          'model_sha256':digest(model),'experiment_sha256':digest(xml),'seed_scheme':'100000 + behaviorspace-run-number (unless explicit representative replay seed)',
+          'model_sha256':digest(model),'experiment_sha256':digest(xml),
+          'seed_scheme':experiment.findtext('setup'),
           'status':'running'}
     provenance.write_text(json.dumps(info,indent=2)+'\n')
     start=time.monotonic()

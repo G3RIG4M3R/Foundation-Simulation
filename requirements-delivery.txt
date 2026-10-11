@@ -1,0 +1,6 @@
+-r requirements-analysis.txt
+reportlab==5.0.1
+python-pptx==1.0.2
+pymupdf==1.28.2
+# Optional GUI recapture
+JPype1==1.7.1

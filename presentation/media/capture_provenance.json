@@ -1,0 +1,95 @@
+{
+  "runtime": "NetLogo 6.4.0 GUI",
+  "model_sha256": "a93bfd37fb6abab3f7d6f57a4c828564a5d3fa83ded4e82da4176c108b10172a",
+  "setup_commands": "set tick-limit 1000 set initial-missionaries 12 set initial-traders 20 set missionary-effectiveness 0.5 set royal-intolerance 0 set trade-attractiveness 0.8 set tech-decay-rate 0.015 set religion-trade-weight 0.8 set independence-effort 0.15 set view-mode \"control\" random-seed 500207 setup",
+  "frame_step": 50,
+  "gif_frame_ms": 200,
+  "measured_states": [
+    {
+      "tick": 0,
+      "control_fraction": 0.0
+    },
+    {
+      "tick": 50,
+      "control_fraction": 0.0
+    },
+    {
+      "tick": 100,
+      "control_fraction": 0.0
+    },
+    {
+      "tick": 150,
+      "control_fraction": 0.06666666666666667
+    },
+    {
+      "tick": 200,
+      "control_fraction": 0.1
+    },
+    {
+      "tick": 250,
+      "control_fraction": 0.16666666666666666
+    },
+    {
+      "tick": 300,
+      "control_fraction": 0.16666666666666666
+    },
+    {
+      "tick": 350,
+      "control_fraction": 0.2
+    },
+    {
+      "tick": 400,
+      "control_fraction": 0.3333333333333333
+    },
+    {
+      "tick": 450,
+      "control_fraction": 0.3333333333333333
+    },
+    {
+      "tick": 500,
+      "control_fraction": 0.4666666666666667
+    },
+    {
+      "tick": 550,
+      "control_fraction": 0.4666666666666667
+    },
+    {
+      "tick": 600,
+      "control_fraction": 0.4666666666666667
+    },
+    {
+      "tick": 650,
+      "control_fraction": 0.5333333333333333
+    },
+    {
+      "tick": 700,
+      "control_fraction": 0.5333333333333333
+    },
+    {
+      "tick": 750,
+      "control_fraction": 0.5666666666666667
+    },
+    {
+      "tick": 800,
+      "control_fraction": 0.6
+    },
+    {
+      "tick": 850,
+      "control_fraction": 0.6333333333333333
+    },
+    {
+      "tick": 900,
+      "control_fraction": 0.6
+    },
+    {
+      "tick": 950,
+      "control_fraction": 0.6
+    },
+    {
+      "tick": 1000,
+      "control_fraction": 0.6333333333333333
+    }
+  ],
+  "matches_confirmatory_replay": true,
+  "note": "Accelerated GUI exports; no state fabricated. Final control 19/30, two kingdoms."
+}
