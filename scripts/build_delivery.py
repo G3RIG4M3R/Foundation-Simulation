@@ -146,7 +146,7 @@ def slides():
     paragraph(c,'<b>What the threshold means</b><br/>A rapid probability change around a defined 50% criterion.<br/>Continuous control rises more smoothly; no proven mathematical phase transition.',510,415,408,21)
     paragraph(c,'<b>Limits and next tests</b><br/>Favorable politics and religion; coarse grid; twenty runs.<br/>Near-boundary crossing can be transient (26/1,001 states in the replay).<br/>Test 14/18 traders with fresh seeds; measure persistence in all runs.',40,235,874,19)
     paragraph(c,'Takeaway: strong economic ties can produce widespread Foundation control in this model.',40,111,874,18,TEAL)
-    paragraph(c,'Sources: Asimov (1951); Wilensky (1999); Takács (2026). AI-assisted development; student review required.',40,50,874,8)
+    paragraph(c,'Sources: Asimov (1951); Wilensky (1999); Takács (2026). AI-assisted development.',40,50,874,8)
     c.showPage();c.save()
     prs=Presentation();prs.slide_width=Inches(13.333333);prs.slide_height=Inches(7.5)
     with tempfile.TemporaryDirectory(prefix='foundation-slides-') as tmp:
