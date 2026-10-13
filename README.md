@@ -62,6 +62,7 @@ stochastic threshold, with smoothly increasing mean control, rather than a
 proven mathematical phase transition.
 
 - [Two-page report](report/foundation_report.pdf)
+- [LaTeX report source](report/foundation_report.tex)
 - [PowerPoint](presentation/foundation.pptx) and [slide PDF](presentation/foundation.pdf)
 - [Rehearsal script](presentation/rehearsal.md) and genuine GUI GIF in `presentation/media/`
 - [Assignment compliance and QA evidence](docs/final_compliance.md)
@@ -70,12 +71,19 @@ proven mathematical phase transition.
 ```bash
 .venv/bin/pip install -r requirements-delivery.txt
 MPLCONFIGDIR=/tmp/foundation-matplotlib .venv/bin/python scripts/analyze_tipping_investigation.py
-.venv/bin/python scripts/build_delivery.py
+./scripts/build_delivery.sh
 .venv/bin/python scripts/validate_delivery.py
 ```
 
-The builder reuses the genuine captured GUI assets; optional recapture needs a
+Install the LaTeX build tools on Ubuntu with
+`sudo apt install texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended lmodern latexmk zip`.
+Edit `report/foundation_report.tex` for report content and `report/author.txt`
+for its author identity. The build script compiles the two-page A4 report with
+LaTeX and refreshes the submission ZIP, using the existing PowerPoint and slide
+PDF. It does not regenerate the presentation or its animated GIF.
+To compile only the report, run `cd report && latexmk -pdf foundation_report.tex`.
+
+Optional GUI recapture needs a
 local display and `.venv/bin/python scripts/capture_demonstration.py
-/home/adam/tools/NetLogo-6.4.0-64`. Set author identity in
-`report/author.txt` before rebuilding (the initial value is an explicit placeholder).
+/home/adam/tools/NetLogo-6.4.0-64`.
 No university upload is performed.

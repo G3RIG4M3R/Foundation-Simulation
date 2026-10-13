@@ -26,7 +26,7 @@ python3 scripts/check_interface.py /home/adam/tools/NetLogo-6.4.0-64 /tmp/founda
 python3 scripts/validate_results.py results/raw/foundation_sweep.csv experiments/foundation_sweep.xml --production
 MPLCONFIGDIR=/tmp/foundation-matplotlib .venv/bin/python scripts/analyze_tipping_investigation.py
 .venv/bin/python scripts/capture_demonstration.py /home/adam/tools/NetLogo-6.4.0-64
-.venv/bin/python scripts/build_delivery.py
+./scripts/build_delivery.sh
 .venv/bin/python scripts/validate_delivery.py --netlogo-home /home/adam/tools/NetLogo-6.4.0-64
 ```
 
@@ -86,12 +86,27 @@ pass; author identity and live-presentation acceptance remain manual.
 ```bash
 .venv/bin/pip install -r requirements-delivery.txt
 MPLCONFIGDIR=/tmp/foundation-matplotlib .venv/bin/python scripts/analyze_tipping_investigation.py
-.venv/bin/python scripts/build_delivery.py
+./scripts/build_delivery.sh
 .venv/bin/python scripts/validate_delivery.py --netlogo-home /home/adam/tools/NetLogo-6.4.0-64
 ```
 
-The builder reuses captured GUI media, generates the two-page report and six-slide
-PPTX/PDF, and packages only the five required files. PowerPoint slide text uses
-shared rendered layouts to preserve appearance; edit the builder to change it.
-Speaker notes remain editable in PowerPoint. Recapture is optional and requires
-JPype1 plus access to the local display.
+The report source is `report/foundation_report.tex`; author identity comes from
+`report/author.txt`. Install `texlive-latex-recommended`, `texlive-latex-extra`,
+`texlive-fonts-recommended`, `lmodern`, `latexmk` and `zip` on Ubuntu.
+The shell builder compiles the LaTeX report and packages only the five required
+files. It retains the existing six-slide PowerPoint and slide PDF. Speaker notes
+remain editable in PowerPoint. Recapture is optional and requires JPype1 plus
+access to the local display.
+
+On 13 October 2026 the report was migrated from Python/ReportLab to LaTeX,
+preserving its text, figures and two-page A4 structure. The original Python
+generator was removed. The build command above now refers to the shell builder;
+the original 11 October audit used the Python builder. Presentation files are
+preserved byte for byte during the migration.
+The rebuilt report was visually inspected and checked for all original headings
+and paragraphs, both figures, and exactly two A4 pages. The existing
+`audit_artifacts()` checks passed, including slide equivalence, the 21-frame GIF
+and byte-identical ZIP contents. The full validator currently stops at
+`model_sha256`: the model matches Git HEAD but differs from the recorded
+confirmatory provenance hash. This migration does not change the model or
+rewrite experiment provenance.

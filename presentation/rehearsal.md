@@ -28,4 +28,5 @@ The PDF shows stills; the PPTX includes the genuine GIF over the tick-0 poster.
 Test animation in PowerPoint slideshow mode. If a viewer does not animate GIFs,
 open `media/foundation_demo.gif` separately; the visible sequence still supports the talk.
 Slide text is rendered from the same PDF layout for consistent appearance.
-Edit content in `scripts/build_delivery.py`, then rebuild.
+The presentation is maintained as an existing PowerPoint and matching slide PDF.
+The LaTeX report build does not regenerate the slides or their animated GIF.
