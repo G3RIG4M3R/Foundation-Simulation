@@ -1856,28 +1856,6 @@ Cumulative total-recruited-missionaries, total-recruited-traders and recruitment
 support exact population and financial audits. Treasury equals 200 plus cumulative
 trade profit under ordinary simulation; current-tick trade income is gross sales.
 
-
-## THINGS TO NOTICE / TRY
-
-Compare several seeds at low versus high royal intolerance while holding other
-settings fixed. Observe religious influence, trade and control separately: a
-religious world need not be controlled, and secular trade can create dependency.
-Default runs can fail to expand; this is a possible outcome, not a blank display.
-
-Set missionaries to zero before setup to observe secular trade. Set traders to
-zero to observe religion without new commercial dependency and recruitment costs
-without trade revenue. Set both counts to zero to isolate environmental change.
-Try 40 of each visitor, effectiveness .5, attractiveness 1, intolerance 0,
-independence effort 0 and wear .005 as a favorable comparison; success is not
-promised for every seed. Restore defaults before comparing default runs.
-
-Watch dependent worlds under E labels: their wealth does not drop instantly when
-sanctioned. Missing support can damage infrastructure and later trigger a crisis.
-An economic concession reopens access but gives no immediate repair or wealth.
-Increase independence effort to compare gradual domestic substitution. Follow a
-capital's policy, wealth memory and cooldown in its inspector. Do not infer a
-universal threshold or historical conclusion from one stochastic run.
-
 ## SIMPLIFICATIONS AND LIMITATIONS
 
 The star map is fictional and early Foundation periods are deliberately blended.
@@ -1909,8 +1887,7 @@ inspiration, not quantitative evidence. Developed for Collective Intelligence,
 Autumn 2026, assignment by Tamás Takács. The assignment is credited to Tamás Takács
 (2026), CC BY-NC-ND 4.0. Source license: MIT, Copyright (c) 2026 G3RIG4M3R.
 No Models Library simulation logic is used. Development used AI assistance for
-code, documentation and verification; the student must review and understand the
-model and follow any additional course disclosure requirements.
+code, documentation and verification.
 
 NetLogo: Wilensky, U. (1999), *NetLogo*. Center for Connected Learning and
 Computer-Based Modeling, Northwestern University, Evanston, IL.
@@ -1978,16 +1955,48 @@ setup
     <metric>model-valid?</metric>
     <metric>netlogo-version</metric>
     <metric>100000 + behaviorspace-run-number</metric>
-    <enumeratedValueSet variable="missionary-effectiveness"><value value="0.1"/><value value="0.15"/><value value="0.2"/><value value="0.25"/><value value="0.3"/><value value="0.35"/><value value="0.4"/></enumeratedValueSet>
-    <enumeratedValueSet variable="royal-intolerance"><value value="0.2"/><value value="0.3"/><value value="0.4"/><value value="0.5"/><value value="0.6"/><value value="0.7"/><value value="0.8"/></enumeratedValueSet>
-    <enumeratedValueSet variable="tick-limit"><value value="450"/></enumeratedValueSet>
-    <enumeratedValueSet variable="initial-missionaries"><value value="12"/></enumeratedValueSet>
-    <enumeratedValueSet variable="initial-traders"><value value="12"/></enumeratedValueSet>
-    <enumeratedValueSet variable="trade-attractiveness"><value value="0.6"/></enumeratedValueSet>
-    <enumeratedValueSet variable="tech-decay-rate"><value value="0.015"/></enumeratedValueSet>
-    <enumeratedValueSet variable="religion-trade-weight"><value value="0.55"/></enumeratedValueSet>
-    <enumeratedValueSet variable="independence-effort"><value value="0.15"/></enumeratedValueSet>
-    <enumeratedValueSet variable="view-mode"><value value="&quot;kingdom&quot;"/></enumeratedValueSet>
+    <enumeratedValueSet variable="missionary-effectiveness">
+      <value value="0.1"/>
+      <value value="0.15"/>
+      <value value="0.2"/>
+      <value value="0.25"/>
+      <value value="0.3"/>
+      <value value="0.35"/>
+      <value value="0.4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="royal-intolerance">
+      <value value="0.2"/>
+      <value value="0.3"/>
+      <value value="0.4"/>
+      <value value="0.5"/>
+      <value value="0.6"/>
+      <value value="0.7"/>
+      <value value="0.8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="tick-limit">
+      <value value="450"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-missionaries">
+      <value value="12"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-traders">
+      <value value="12"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="trade-attractiveness">
+      <value value="0.6"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="tech-decay-rate">
+      <value value="0.015"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="religion-trade-weight">
+      <value value="0.55"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="independence-effort">
+      <value value="0.15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="view-mode">
+      <value value="&quot;kingdom&quot;"/>
+    </enumeratedValueSet>
   </experiment>
   <experiment name="Foundation Extended Sweep (1000 ticks)" repetitions="20" runMetricsEveryStep="false">
     <setup>random-seed (100000 + behaviorspace-run-number) setup</setup>
@@ -2010,16 +2019,48 @@ setup
     <metric>model-valid?</metric>
     <metric>netlogo-version</metric>
     <metric>100000 + behaviorspace-run-number</metric>
-    <enumeratedValueSet variable="missionary-effectiveness"><value value="0.1"/><value value="0.15"/><value value="0.2"/><value value="0.25"/><value value="0.3"/><value value="0.35"/><value value="0.4"/></enumeratedValueSet>
-    <enumeratedValueSet variable="royal-intolerance"><value value="0.2"/><value value="0.3"/><value value="0.4"/><value value="0.5"/><value value="0.6"/><value value="0.7"/><value value="0.8"/></enumeratedValueSet>
-    <enumeratedValueSet variable="tick-limit"><value value="1000"/></enumeratedValueSet>
-    <enumeratedValueSet variable="initial-missionaries"><value value="12"/></enumeratedValueSet>
-    <enumeratedValueSet variable="initial-traders"><value value="12"/></enumeratedValueSet>
-    <enumeratedValueSet variable="trade-attractiveness"><value value="0.6"/></enumeratedValueSet>
-    <enumeratedValueSet variable="tech-decay-rate"><value value="0.015"/></enumeratedValueSet>
-    <enumeratedValueSet variable="religion-trade-weight"><value value="0.55"/></enumeratedValueSet>
-    <enumeratedValueSet variable="independence-effort"><value value="0.15"/></enumeratedValueSet>
-    <enumeratedValueSet variable="view-mode"><value value="&quot;kingdom&quot;"/></enumeratedValueSet>
+    <enumeratedValueSet variable="missionary-effectiveness">
+      <value value="0.1"/>
+      <value value="0.15"/>
+      <value value="0.2"/>
+      <value value="0.25"/>
+      <value value="0.3"/>
+      <value value="0.35"/>
+      <value value="0.4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="royal-intolerance">
+      <value value="0.2"/>
+      <value value="0.3"/>
+      <value value="0.4"/>
+      <value value="0.5"/>
+      <value value="0.6"/>
+      <value value="0.7"/>
+      <value value="0.8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="tick-limit">
+      <value value="1000"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-missionaries">
+      <value value="12"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-traders">
+      <value value="12"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="trade-attractiveness">
+      <value value="0.6"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="tech-decay-rate">
+      <value value="0.015"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="religion-trade-weight">
+      <value value="0.55"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="independence-effort">
+      <value value="0.15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="view-mode">
+      <value value="&quot;kingdom&quot;"/>
+    </enumeratedValueSet>
   </experiment>
 </experiments>
 @#$#@#$#@
