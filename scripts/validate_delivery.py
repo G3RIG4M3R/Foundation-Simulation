@@ -88,14 +88,14 @@ def audit_science():
 
 def audit_artifacts():
     report=pymupdf.open(ROOT/'report/foundation_report.pdf');assert len(report)==2
-    deck=pymupdf.open(ROOT/'presentation/foundation.pdf');assert len(deck)==6
+    deck=pymupdf.open(ROOT/'presentation/foundation.pdf');assert len(deck)==7
     for doc in (report,deck):
         for page in doc:
             assert page.get_text().strip()
             for block in page.get_text('dict')['blocks']:
                 if block['type']==0:
                     x0,y0,x1,y1=block['bbox'];assert x0>=0 and y0>=0 and x1<=page.rect.width+.5 and y1<=page.rect.height+.5
-    prs=Presentation(ROOT/'presentation/foundation.pptx');assert len(prs.slides)==6
+    prs=Presentation(ROOT/'presentation/foundation.pptx');assert len(prs.slides)==7
     for i,slide in enumerate(prs.slides):
         assert slide.notes_slide.notes_text_frame.text.strip()
         actual=Image.open(io.BytesIO(slide.shapes[0].image.blob)).convert('RGB')
@@ -104,14 +104,14 @@ def audit_artifacts():
         assert actual.size==expected.size and actual.tobytes()==expected.tobytes()
     assert slide.shapes[0].width==prs.slide_width
     gif=Image.open(MEDIA/'foundation_demo.gif');assert gif.n_frames==21
-    assert prs.slides[2].shapes[1].image.ext=='gif'
+    assert prs.slides[3].shapes[1].image.ext=='gif'
     expected={'model/foundation.nlogo','experiments/tipping_confirmatory.xml','report/foundation_report.pdf','presentation/foundation.pptx','presentation/foundation.pdf'}
     with zipfile.ZipFile(ROOT/'dist/Foundation_Simulation_Submission.zip') as z:
         assert set(z.namelist())==expected and z.testzip() is None
         with tempfile.TemporaryDirectory(prefix='foundation-extracted-') as temp:
             z.extractall(temp)
             for name in expected:assert (Path(temp)/name).read_bytes()==(ROOT/name).read_bytes()
-    print('PASS: 2 report pages; 6 slides in each format; identical slide rendering; real 21-frame GIF; five-file ZIP extracts byte-identically')
+    print('PASS: 2 report pages; title + 6 content slides in each format; identical slide rendering; real 21-frame GIF; five-file ZIP extracts byte-identically')
 
 
 def runtime(home,rows):

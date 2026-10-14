@@ -1,5 +1,9 @@
 # Rehearsal script (target 5:30)
 
+## Title slide — before the timed talk
+
+Introduce yourself and the project, then advance to the research question and start the timer. The six content slides retain their existing numbering.
+
 ## Slide 1 — 0:00–0:50
 
 Asimov imagined a small technologically advanced Foundation gaining influence without military conquest. We abstract this into religion and commerce, rather than reenacting the novels. Ask the question on the slide. Our hypothesis is that frequent, attractive trade creates dependency under favorable access. The result describes this fictional simulation, not real societies.
